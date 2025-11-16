@@ -3,13 +3,14 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from app.core.config import settings
+from app.core.logging import app_logger as logger
 from .vectorstore import vectorstore_service
 
 
 class RAGPipeline:
     """RAG 파이프라인 - 검색 증강 생성"""
 
-    def __init__(self):
+    def __init__(self, cache=None):
         self.llm = ChatOpenAI(
             api_key=settings.OPENAI_API_KEY,
             model="gpt-4",
@@ -20,6 +21,7 @@ class RAGPipeline:
             chunk_overlap=settings.CHUNK_OVERLAP,
             separators=["\n\n", "\n", ". ", " ", ""],
         )
+        self.cache = cache
 
     def split_text(self, text: str) -> List[str]:
         """텍스트를 청크로 분할"""
@@ -28,7 +30,14 @@ class RAGPipeline:
     async def answer_question(
         self, question: str, paper_id: Optional[int] = None, k: int = 5
     ) -> dict:
-        """질문에 답변 생성"""
+        """질문에 답변 생성 (캐싱 지원)"""
+        # 캐시 확인
+        if self.cache:
+            cached = await self.cache.get_rag_answer(question, paper_id)
+            if cached:
+                logger.info(f"RAG Q&A 캐시 HIT: {question[:50]}...")
+                return cached
+
         # 유사 문서 검색
         search_results = vectorstore_service.search(question, k=k)
 
@@ -97,11 +106,17 @@ class RAGPipeline:
             for doc, score in search_results[:3]
         ]
 
-        return {
+        result = {
             "answer": response.content,
             "sources": sources,
             "confidence": 1.0 - min(search_results[0][1] / 10, 1.0),
         }
+
+        # 캐시에 저장 (2시간)
+        if self.cache:
+            await self.cache.set_rag_answer(question, result, paper_id, expire=7200)
+
+        return result
 
     async def summarize_paper(self, paper_text: str, paper_title: str) -> dict:
         """논문 요약 생성"""

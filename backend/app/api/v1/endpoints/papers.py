@@ -6,8 +6,9 @@ from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.paper import Paper
 from app.schemas.paper import PaperSearch, PaperCreate, PaperResponse, PaperUpload
-from app.services.pubmed_service import pubmed_service
+from app.services.pubmed_service import PubMedService
 from app.services.pdf_service import pdf_service
+from app.services.cache_service import cache
 from app.rag.vectorstore import vectorstore_service
 from app.rag.rag_pipeline import rag_pipeline
 import time
@@ -20,8 +21,9 @@ async def search_papers(
     search: PaperSearch,
     current_user: User = Depends(get_current_user),
 ):
-    """PubMed에서 논문 검색"""
-    papers = pubmed_service.search_papers(
+    """PubMed에서 논문 검색 (캐싱 지원)"""
+    pubmed_service = PubMedService(cache=cache)
+    papers = await pubmed_service.search_papers(
         query=search.query,
         max_results=search.max_results,
         sort=search.sort,

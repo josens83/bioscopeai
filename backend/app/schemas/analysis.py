@@ -34,12 +34,34 @@ class AnalysisResponse(BaseModel):
 class QuestionRequest(BaseModel):
     """질문 요청 스키마"""
 
-    question: str = Field(..., min_length=1)
-    paper_id: Optional[int] = None
-    k: int = Field(default=5, ge=1, le=20)
+    question: str = Field(..., min_length=1, description="질문", example="What are the main findings of this study?")
+    paper_id: Optional[int] = Field(None, description="특정 논문 ID (선택사항)", example=1)
+    k: int = Field(default=5, ge=1, le=20, description="검색할 문서 청크 수", example=5)
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "question": "What are the key applications of CRISPR technology?",
+                    "paper_id": 1,
+                    "k": 5
+                }
+            ]
+        }
+    }
 
 
 class ComparisonRequest(BaseModel):
     """비교 분석 요청 스키마"""
 
-    paper_ids: List[int] = Field(..., min_items=2, max_items=10)
+    paper_ids: List[int] = Field(..., min_items=2, max_items=10, description="비교할 논문 ID 리스트 (2-10개)", example=[1, 2, 3])
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "paper_ids": [1, 2, 3]
+                }
+            ]
+        }
+    }
