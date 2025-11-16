@@ -35,7 +35,7 @@
     "eslint": "^9.39.1",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
-    "vitest": "^1.2.0",
+    "vitest": "^4.0.9",
     "@vitest/ui": "^4.0.9",
     "@testing-library/react": "^14.1.2",
     "@testing-library/jest-dom": "^6.2.0",
