@@ -16,10 +16,7 @@ router = APIRouter()
 
 def is_admin(current_user: User) -> bool:
     """관리자 권한 확인"""
-    # 실제 구현에서는 User 모델에 is_admin 필드 추가 권장
-    # 여기서는 이메일 기반으로 간단히 확인
-    admin_emails = ["admin@bioscopeai.com"]
-    return current_user.email in admin_emails
+    return current_user.is_superuser
 
 
 @router.get("/stats")

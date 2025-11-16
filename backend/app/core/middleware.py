@@ -2,7 +2,7 @@
 커스텀 미들웨어
 """
 import time
-from fastapi import Request
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.logging import app_logger as logger
 
@@ -60,3 +60,51 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 },
             )
             raise
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """보안 헤더 미들웨어"""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        # OWASP 권장 보안 헤더 추가
+        # https://owasp.org/www-project-secure-headers/
+
+        # XSS 보호
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+
+        # Clickjacking 방지
+        response.headers["X-Frame-Options"] = "DENY"
+
+        # Content Security Policy
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' data:; "
+            "connect-src 'self'"
+        )
+
+        # HTTPS 강제 (Strict-Transport-Security)
+        # production 환경에서만 활성화 권장
+        # response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+        # Referrer Policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+        # Permissions Policy (구 Feature-Policy)
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), "
+            "microphone=(), "
+            "camera=(), "
+            "payment=(), "
+            "usb=(), "
+            "magnetometer=(), "
+            "gyroscope=(), "
+            "speaker=()"
+        )
+
+        return response

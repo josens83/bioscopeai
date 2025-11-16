@@ -51,6 +51,7 @@ class UserResponse(BaseModel):
     username: str = Field(..., description="사용자 이름", example="johndoe")
     full_name: Optional[str] = Field(None, description="전체 이름", example="홍길동")
     is_active: bool = Field(..., description="활성화 상태", example=True)
+    is_verified: bool = Field(default=False, description="이메일 인증 여부", example=False)
     created_at: datetime = Field(..., description="계정 생성일시", example="2024-01-01T00:00:00")
 
     model_config = {
@@ -63,6 +64,7 @@ class UserResponse(BaseModel):
                     "username": "demouser",
                     "full_name": "데모 사용자",
                     "is_active": True,
+                    "is_verified": True,
                     "created_at": "2024-01-01T00:00:00"
                 }
             ]
@@ -84,6 +86,56 @@ class TokenResponse(BaseModel):
                     "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNjQwOTk1MjAwfQ.xyz",
                     "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNjQxNjAwMDAwfQ.abc",
                     "token_type": "bearer"
+                }
+            ]
+        }
+    }
+
+
+class PasswordResetRequest(BaseModel):
+    """비밀번호 재설정 요청 스키마"""
+
+    email: EmailStr = Field(..., description="비밀번호를 재설정할 계정의 이메일 주소", example="user@example.com")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "email": "user@bioscopeai.com"
+                }
+            ]
+        }
+    }
+
+
+class PasswordReset(BaseModel):
+    """비밀번호 재설정 스키마"""
+
+    token: str = Field(..., description="이메일로 받은 재설정 토큰", example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+    new_password: str = Field(..., min_length=8, description="새 비밀번호 (최소 8자)", example="NewSecurePass123!")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIn0...",
+                    "new_password": "MyNewPassword456!"
+                }
+            ]
+        }
+    }
+
+
+class EmailVerification(BaseModel):
+    """이메일 인증 스키마"""
+
+    token: str = Field(..., description="이메일로 받은 인증 토큰", example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIn0..."
                 }
             ]
         }

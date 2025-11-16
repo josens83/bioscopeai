@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.logging import app_logger as logger
-from app.core.middleware import RequestLoggingMiddleware
+from app.core.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
 from app.services.cache_service import cache
 from app.api.v1.router import api_router
 import sentry_sdk
@@ -163,6 +163,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 보안 헤더 미들웨어
+app.add_middleware(SecurityHeadersMiddleware)
 
 # 요청 로깅 미들웨어
 app.add_middleware(RequestLoggingMiddleware)
