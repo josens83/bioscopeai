@@ -1,16 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.api.deps import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def register(request: Request, user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     """사용자 등록"""
     # 이메일 중복 확인
     result = await db.execute(select(User).where(User.email == user_in.email))
@@ -44,7 +48,8 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(user_in: UserLogin, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, user_in: UserLogin, db: AsyncSession = Depends(get_db)):
     """로그인"""
     # 사용자 조회
     result = await db.execute(select(User).where(User.email == user_in.email))

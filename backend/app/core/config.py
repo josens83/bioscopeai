@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     # 기본 설정
     APP_NAME: str = "BioscopeAI"
     APP_VERSION: str = "1.0.0"
+    ENVIRONMENT: str = "development"  # development, production
     DEBUG: bool = True
     SECRET_KEY: str
 
