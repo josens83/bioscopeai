@@ -35,7 +35,7 @@ PyMuPDF==1.23.8
 pypdf==3.17.4
 
 # PubMed API
-biopython==1.83
+biopython==1.86
 requests==2.31.0
 httpx==0.26.0
 
