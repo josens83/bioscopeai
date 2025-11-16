@@ -10,6 +10,26 @@ from app.core.logging import app_logger as logger
 from app.core.middleware import RequestLoggingMiddleware
 from app.services.cache_service import cache
 from app.api.v1.router import api_router
+import sentry_sdk
+
+
+# Sentry 초기화 (DSN이 설정된 경우에만)
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.SENTRY_ENVIRONMENT,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        profiles_sample_rate=1.0 if settings.ENVIRONMENT == "development" else 0.1,
+        # 성능 모니터링
+        enable_tracing=True,
+        # FastAPI 통합
+        integrations=[],
+        # 민감한 데이터 필터링
+        before_send=lambda event, hint: event if settings.ENVIRONMENT != "development" else event,
+    )
+    logger.info("✅ Sentry 초기화 완료")
+else:
+    logger.info("ℹ️  Sentry DSN이 설정되지 않음 - 에러 추적 비활성화")
 
 
 @asynccontextmanager
@@ -87,6 +107,10 @@ description = """
 
 tags_metadata = [
     {
+        "name": "health",
+        "description": "시스템 상태 확인 (Health Check, Readiness, Liveness)",
+    },
+    {
         "name": "auth",
         "description": "사용자 인증 및 등록",
     },
@@ -101,6 +125,10 @@ tags_metadata = [
     {
         "name": "subscription",
         "description": "구독 플랜 및 결제 관리",
+    },
+    {
+        "name": "admin",
+        "description": "관리자 전용 (사용자 통계, 시스템 모니터링)",
     },
 ]
 
@@ -151,10 +179,5 @@ async def root(request: Request):
         "message": f"Welcome to {settings.APP_NAME} API",
         "version": settings.APP_VERSION,
         "docs": "/docs",
+        "health": "/api/v1/health",
     }
-
-
-@app.get("/health")
-async def health_check():
-    """헬스 체크 (Rate limit 없음)"""
-    return {"status": "healthy"}

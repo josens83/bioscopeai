@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     PUBMED_EMAIL: str
     PUBMED_API_KEY: str = ""
 
+    # Sentry (선택사항)
+    SENTRY_DSN: str = ""
+    SENTRY_ENVIRONMENT: str = "development"
+    SENTRY_TRACES_SAMPLE_RATE: float = 1.0  # 프로덕션에서는 0.1-0.5 권장
+
     class Config:
         env_file = ".env"
         case_sensitive = True
