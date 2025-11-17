@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.core.logging import app_logger as logger
 from app.core.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
+from app.core.error_handlers import register_exception_handlers
 from app.services.cache_service import cache
 from app.api.v1.router import api_router
 import sentry_sdk
@@ -112,23 +113,27 @@ tags_metadata = [
     },
     {
         "name": "auth",
-        "description": "사용자 인증 및 등록",
+        "description": "사용자 인증 및 등록 (회원가입, 로그인, 비밀번호 재설정, 이메일 인증)",
     },
     {
         "name": "papers",
-        "description": "논문 관리 (검색, 업로드, CRUD)",
+        "description": "논문 관리 (PubMed 검색, PDF 업로드, CRUD)",
     },
     {
         "name": "analysis",
-        "description": "AI 기반 논문 분석 (Q&A, 요약, 비교)",
+        "description": "AI 기반 논문 분석 (Q&A, 요약, 비교) - 사용량 추적 적용",
+    },
+    {
+        "name": "usage",
+        "description": "사용량 조회 및 플랜 정보 (내 사용량, 플랜 비교, 기능 접근 권한)",
     },
     {
         "name": "subscription",
-        "description": "구독 플랜 및 결제 관리",
+        "description": "구독 플랜 및 결제 관리 (Stripe 통합, 웹훅 처리)",
     },
     {
         "name": "admin",
-        "description": "관리자 전용 (사용자 통계, 시스템 모니터링)",
+        "description": "관리자 전용 (사용자 통계, 비즈니스 메트릭, 사용량 분석)",
     },
 ]
 
@@ -150,6 +155,9 @@ app = FastAPI(
         "url": "https://opensource.org/licenses/MIT",
     },
 )
+
+# 전역 예외 핸들러 등록
+register_exception_handlers(app)
 
 # Rate Limit 상태 및 핸들러 설정
 app.state.limiter = limiter

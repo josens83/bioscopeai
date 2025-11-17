@@ -6,11 +6,11 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.sql import func
-from fastapi import HTTPException, status
 from app.models.usage import Usage, PlanLimit
 from app.models.user import User
 from app.models.subscription import Subscription
 from app.core.logging import app_logger as logger
+from app.core.exceptions import UsageLimitExceeded, FeatureNotAvailable
 
 
 class UsageService:
@@ -126,15 +126,11 @@ class UsageService:
                 f"사용량 제한 초과: user_id={user_id}, plan={plan_name}, "
                 f"type={usage_type}, current={current}, limit={limit}"
             )
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail={
-                    "message": f"{usage_type} 월별 사용량 한도를 초과했습니다.",
-                    "current": current,
-                    "limit": limit,
-                    "plan": plan_name,
-                    "upgrade_required": True
-                }
+            raise UsageLimitExceeded(
+                usage_type=usage_type,
+                current=current,
+                limit=limit,
+                plan=plan_name
             )
 
         # 사용량 증가
@@ -189,25 +185,17 @@ class UsageService:
 
         if feature == "pdf_export":
             if not plan_limit.pdf_export:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail={
-                        "message": "PDF 내보내기는 Basic 플랜 이상에서 사용 가능합니다.",
-                        "feature": feature,
-                        "plan": plan_name,
-                        "upgrade_required": True
-                    }
+                raise FeatureNotAvailable(
+                    feature="PDF 내보내기",
+                    required_plan="Basic",
+                    current_plan=plan_name
                 )
         elif feature == "priority_support":
             if not plan_limit.priority_support:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail={
-                        "message": "우선 지원은 Pro 플랜에서만 제공됩니다.",
-                        "feature": feature,
-                        "plan": plan_name,
-                        "upgrade_required": True
-                    }
+                raise FeatureNotAvailable(
+                    feature="우선 지원",
+                    required_plan="Pro",
+                    current_plan=plan_name
                 )
 
         return True
