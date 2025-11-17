@@ -10,31 +10,16 @@ from app.core.logging import app_logger as logger
 from app.core.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
 from app.core.error_handlers import register_exception_handlers
 from app.core.config_validator import validate_environment_on_startup
+from app.core.sentry import init_sentry
 from app.services.cache_service import cache
 from app.api.v1.router import api_router
-import sentry_sdk
 
 
 # 환경 설정 검증 (앱 시작 전)
 validate_environment_on_startup()
 
-# Sentry 초기화 (DSN이 설정된 경우에만)
-if settings.SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=settings.SENTRY_ENVIRONMENT,
-        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-        profiles_sample_rate=1.0 if settings.ENVIRONMENT == "development" else 0.1,
-        # 성능 모니터링
-        enable_tracing=True,
-        # FastAPI 통합
-        integrations=[],
-        # 민감한 데이터 필터링
-        before_send=lambda event, hint: event if settings.ENVIRONMENT != "development" else event,
-    )
-    logger.info("✅ Sentry 초기화 완료")
-else:
-    logger.info("ℹ️  Sentry DSN이 설정되지 않음 - 에러 추적 비활성화")
+# Sentry 초기화 (프로덕션 에러 모니터링)
+init_sentry()
 
 
 @asynccontextmanager

@@ -11,8 +11,9 @@ from app.models.paper import Paper
 from app.models.analysis import Analysis
 from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
 from app.models.usage import Usage
+from app.models.audit_log import AuditLog
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 
 router = APIRouter()
 
@@ -635,3 +636,237 @@ async def update_user_role(
     logger.info(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})의 역할을 {old_role} -> {role}로 변경했습니다")
 
     return {"message": f"사용자 {user.email}의 역할이 {role}(으)로 변경되었습니다"}
+
+
+@router.get("/audit-logs")
+async def get_audit_logs(
+    skip: int = 0,
+    limit: int = 100,
+    user_id: Optional[int] = None,
+    action: Optional[str] = None,
+    resource_type: Optional[str] = None,
+    status: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    감사 로그 조회 (관리자 전용)
+
+    - 페이지네이션 지원
+    - 다양한 필터 옵션:
+      - user_id: 특정 사용자의 로그만 조회
+      - action: 특정 액션 필터 (예: user.login, admin.user.suspended)
+      - resource_type: 리소스 타입 필터 (예: user, subscription)
+      - status: 상태 필터 (success, failure, error)
+      - start_date/end_date: 날짜 범위 필터
+    """
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다"
+        )
+
+    # 기본 쿼리
+    query = select(AuditLog)
+
+    # 필터 적용
+    conditions = []
+    if user_id is not None:
+        conditions.append(AuditLog.user_id == user_id)
+    if action:
+        conditions.append(AuditLog.action == action)
+    if resource_type:
+        conditions.append(AuditLog.resource_type == resource_type)
+    if status:
+        conditions.append(AuditLog.status == status)
+    if start_date:
+        conditions.append(AuditLog.created_at >= start_date)
+    if end_date:
+        conditions.append(AuditLog.created_at <= end_date)
+
+    if conditions:
+        query = query.where(and_(*conditions))
+
+    # 정렬 (최신순)
+    query = query.order_by(AuditLog.created_at.desc())
+
+    # 총 개수 조회
+    count_query = select(func.count()).select_from(AuditLog)
+    if conditions:
+        count_query = count_query.where(and_(*conditions))
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+
+    # 페이지네이션
+    query = query.offset(skip).limit(limit)
+
+    # 실행
+    result = await db.execute(query)
+    audit_logs = result.scalars().all()
+
+    return {
+        "audit_logs": [
+            {
+                "id": log.id,
+                "user_id": log.user_id,
+                "username": log.username,
+                "email": log.email,
+                "action": log.action,
+                "resource_type": log.resource_type,
+                "resource_id": log.resource_id,
+                "description": log.description,
+                "changes": log.changes,
+                "metadata": log.metadata,
+                "ip_address": log.ip_address,
+                "user_agent": log.user_agent,
+                "status": log.status,
+                "error_message": log.error_message,
+                "created_at": log.created_at.isoformat(),
+            }
+            for log in audit_logs
+        ],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+
+@router.get("/audit-logs/{log_id}")
+async def get_audit_log_detail(
+    log_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """특정 감사 로그 상세 조회 (관리자 전용)"""
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다"
+        )
+
+    result = await db.execute(select(AuditLog).where(AuditLog.id == log_id))
+    log = result.scalar_one_or_none()
+
+    if not log:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="감사 로그를 찾을 수 없습니다"
+        )
+
+    return {
+        "id": log.id,
+        "user_id": log.user_id,
+        "username": log.username,
+        "email": log.email,
+        "action": log.action,
+        "resource_type": log.resource_type,
+        "resource_id": log.resource_id,
+        "description": log.description,
+        "changes": log.changes,
+        "metadata": log.metadata,
+        "ip_address": log.ip_address,
+        "user_agent": log.user_agent,
+        "status": log.status,
+        "error_message": log.error_message,
+        "created_at": log.created_at.isoformat(),
+    }
+
+
+@router.get("/audit-logs/actions/list")
+async def list_audit_actions(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """사용 가능한 모든 액션 타입 목록 조회 (관리자 전용)"""
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다"
+        )
+
+    result = await db.execute(
+        select(distinct(AuditLog.action)).order_by(AuditLog.action)
+    )
+    actions = result.scalars().all()
+
+    return {"actions": actions}
+
+
+@router.get("/audit-logs/stats")
+async def get_audit_stats(
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    감사 로그 통계 (관리자 전용)
+
+    - 기간별 로그 수
+    - 액션별 분포
+    - 실패한 작업 수
+    - 가장 활동적인 사용자
+    """
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다"
+        )
+
+    time_threshold = datetime.utcnow() - timedelta(days=days)
+
+    # 총 로그 수
+    total_logs_result = await db.execute(
+        select(func.count(AuditLog.id)).where(AuditLog.created_at >= time_threshold)
+    )
+    total_logs = total_logs_result.scalar()
+
+    # 액션별 분포
+    action_dist_result = await db.execute(
+        select(AuditLog.action, func.count(AuditLog.id))
+        .where(AuditLog.created_at >= time_threshold)
+        .group_by(AuditLog.action)
+        .order_by(func.count(AuditLog.id).desc())
+        .limit(10)
+    )
+    action_distribution = {action: count for action, count in action_dist_result.all()}
+
+    # 실패한 작업 수
+    failed_logs_result = await db.execute(
+        select(func.count(AuditLog.id)).where(
+            and_(
+                AuditLog.created_at >= time_threshold,
+                AuditLog.status.in_(["failure", "error"])
+            )
+        )
+    )
+    failed_logs = failed_logs_result.scalar()
+
+    # 가장 활동적인 사용자 Top 10
+    active_users_result = await db.execute(
+        select(AuditLog.user_id, AuditLog.username, func.count(AuditLog.id).label("activity_count"))
+        .where(
+            and_(
+                AuditLog.created_at >= time_threshold,
+                AuditLog.user_id.isnot(None)
+            )
+        )
+        .group_by(AuditLog.user_id, AuditLog.username)
+        .order_by(func.count(AuditLog.id).desc())
+        .limit(10)
+    )
+    active_users = [
+        {"user_id": user_id, "username": username, "activity_count": count}
+        for user_id, username, count in active_users_result.all()
+    ]
+
+    return {
+        "period_days": days,
+        "total_logs": total_logs,
+        "failed_logs": failed_logs,
+        "success_rate": round((total_logs - failed_logs) / total_logs * 100, 2) if total_logs > 0 else 100,
+        "action_distribution": action_distribution,
+        "most_active_users": active_users,
+        "timestamp": datetime.utcnow().isoformat(),
+    }

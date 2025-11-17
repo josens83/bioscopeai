@@ -2,6 +2,7 @@
 사용자 프로필 관리 API
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
@@ -11,7 +12,9 @@ from app.models.user import User
 from app.schemas.user import UserResponse, UserUpdate, PasswordChange
 from app.core.security import verify_password, get_password_hash
 from app.services.audit_service import log_user_updated, log_password_changed, AuditService
+from app.services.data_export_service import export_user_data_json
 from app.core.logging import app_logger as logger
+from datetime import datetime
 
 router = APIRouter()
 
@@ -166,3 +169,49 @@ async def get_user_by_id(
         )
 
     return user
+
+
+@router.get("/me/export-data")
+async def export_my_data(
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    내 데이터 내보내기 (GDPR 준수)
+
+    사용자의 모든 개인 데이터를 JSON 형식으로 다운로드
+    포함 내용:
+    - 프로필 정보
+    - 업로드한 논문
+    - 분석 히스토리
+    - 구독 정보
+    - 사용량 기록
+    - 감사 로그
+    """
+    # 데이터 내보내기
+    data_json = await export_user_data_json(db, current_user)
+
+    # 감사 로그 기록
+    audit = AuditService(db)
+    await audit.log(
+        action="user.data_exported",
+        user=current_user,
+        resource_type="user",
+        resource_id=current_user.id,
+        description=f"사용자가 자신의 데이터를 내보냄 (GDPR)",
+        request=request,
+    )
+
+    logger.info(f"사용자 데이터 내보내기: {current_user.id} ({current_user.email})")
+
+    # JSON 파일로 다운로드
+    filename = f"bioscopeai_data_{current_user.username}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+
+    return Response(
+        content=data_json,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )

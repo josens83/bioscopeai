@@ -8,6 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.exc import IntegrityError, OperationalError
 from app.core.exceptions import BioscopeAIException
 from app.core.logging import app_logger as logger
+from app.core.sentry import capture_exception
 import traceback
 
 
@@ -99,6 +100,14 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
         }
     )
 
+    # Sentry에 보고
+    capture_exception(exc, context={
+        "request": {
+            "path": request.url.path,
+            "method": request.method
+        }
+    })
+
     # 중복 키 오류 감지
     error_msg = str(exc.orig)
     if "unique" in error_msg.lower() or "duplicate" in error_msg.lower():
@@ -134,6 +143,15 @@ async def operational_error_handler(request: Request, exc: OperationalError) -> 
         exc_info=True
     )
 
+    # Sentry에 보고 (중요한 인프라 오류)
+    capture_exception(exc, context={
+        "request": {
+            "path": request.url.path,
+            "method": request.method
+        },
+        "severity": "critical"
+    })
+
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={
@@ -157,6 +175,15 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
         },
         exc_info=True
     )
+
+    # Sentry에 보고 (모든 미처리 예외)
+    capture_exception(exc, context={
+        "request": {
+            "path": request.url.path,
+            "method": request.method
+        },
+        "traceback": traceback.format_exc()
+    })
 
     # 프로덕션 환경에서는 상세 오류를 노출하지 않음
     return JSONResponse(

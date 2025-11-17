@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
     SENTRY_ENVIRONMENT: str = "development"
     SENTRY_TRACES_SAMPLE_RATE: float = 1.0  # 프로덕션에서는 0.1-0.5 권장
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.1  # 프로파일링 샘플 비율
 
     # 이메일 (선택사항)
     SMTP_HOST: str = "smtp.gmail.com"
