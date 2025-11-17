@@ -33,3 +33,4 @@ class User(Base):
     subscriptions = relationship("Subscription", back_populates="user")
     papers = relationship("Paper", back_populates="user")
     analyses = relationship("Analysis", back_populates="user")
+    usages = relationship("Usage", back_populates="user")

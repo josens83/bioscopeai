@@ -9,6 +9,7 @@ from app.schemas.paper import PaperSearch, PaperCreate, PaperResponse, PaperUplo
 from app.services.pubmed_service import PubMedService
 from app.services.pdf_service import pdf_service
 from app.services.cache_service import cache
+from app.services.usage_service import UsageService
 from app.rag.vectorstore import vectorstore_service
 from app.rag.rag_pipeline import rag_pipeline
 import time
@@ -37,7 +38,10 @@ async def create_paper(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """논문 저장 (PubMed 또는 수동)"""
+    """논문 저장 (PubMed 또는 수동, 사용량 추적)"""
+    # 사용량 확인 및 증가
+    await UsageService.check_and_increment(db, current_user.id, "paper")
+
     # 논문 생성
     paper = Paper(
         user_id=current_user.id,
@@ -78,7 +82,10 @@ async def upload_paper(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """PDF 업로드"""
+    """PDF 업로드 (사용량 추적)"""
+    # 사용량 확인 및 증가
+    await UsageService.check_and_increment(db, current_user.id, "paper")
+
     # 파일 형식 확인
     if not file.filename.endswith(".pdf"):
         raise HTTPException(
