@@ -140,3 +140,41 @@ class EmailVerification(BaseModel):
             ]
         }
     }
+
+
+class UserUpdate(BaseModel):
+    """사용자 정보 업데이트 스키마"""
+
+    email: Optional[EmailStr] = Field(None, description="새 이메일 주소", example="newemail@example.com")
+    username: Optional[str] = Field(None, min_length=3, max_length=50, description="새 사용자 이름", example="newusername")
+    full_name: Optional[str] = Field(None, description="새 전체 이름", example="김철수")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "email": "newemail@bioscopeai.com",
+                    "username": "newusername",
+                    "full_name": "김철수"
+                }
+            ]
+        }
+    }
+
+
+class PasswordChange(BaseModel):
+    """비밀번호 변경 스키마"""
+
+    current_password: str = Field(..., description="현재 비밀번호", example="CurrentPass123!")
+    new_password: str = Field(..., min_length=8, description="새 비밀번호 (최소 8자)", example="NewSecurePass456!")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "current_password": "OldPassword123!",
+                    "new_password": "NewPassword456!"
+                }
+            ]
+        }
+    }

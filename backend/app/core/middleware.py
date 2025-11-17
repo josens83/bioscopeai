@@ -63,39 +63,48 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """보안 헤더 미들웨어"""
+    """
+    보안 헤더 미들웨어
+
+    OWASP 권장 보안 헤더 추가
+    https://owasp.org/www-project-secure-headers/
+    """
 
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
 
-        # OWASP 권장 보안 헤더 추가
-        # https://owasp.org/www-project-secure-headers/
-
-        # XSS 보호
+        # X-Content-Type-Options: MIME 타입 스니핑 방지
         response.headers["X-Content-Type-Options"] = "nosniff"
+
+        # X-XSS-Protection: XSS 공격 탐지 및 차단 (구형 브라우저용)
         response.headers["X-XSS-Protection"] = "1; mode=block"
 
-        # Clickjacking 방지
+        # X-Frame-Options: Clickjacking 공격 방지
         response.headers["X-Frame-Options"] = "DENY"
 
-        # Content Security Policy
+        # Content-Security-Policy: XSS 및 데이터 인젝션 공격 방지
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://js.stripe.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
-            "font-src 'self' data:; "
-            "connect-src 'self'"
+            "connect-src 'self' https://api.stripe.com; "
+            "frame-src https://js.stripe.com https://hooks.stripe.com; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self';"
         )
 
-        # HTTPS 강제 (Strict-Transport-Security)
-        # production 환경에서만 활성화 권장
-        # response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        # Strict-Transport-Security: HTTPS 강제 (프로덕션 환경만)
+        from app.core.config import settings
+        if settings.ENVIRONMENT == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
-        # Referrer Policy
+        # Referrer-Policy: 리퍼러 정보 제어
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
-        # Permissions Policy (구 Feature-Policy)
+        # Permissions-Policy: 브라우저 기능 접근 제어
         response.headers["Permissions-Policy"] = (
             "geolocation=(), "
             "microphone=(), "
@@ -104,7 +113,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "usb=(), "
             "magnetometer=(), "
             "gyroscope=(), "
-            "speaker=()"
+            "speaker=(), "
+            "fullscreen=(self)"
         )
+
+        # 서버 정보 숨기기
+        response.headers.pop("Server", None)
+        response.headers.pop("X-Powered-By", None)
 
         return response

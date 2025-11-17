@@ -409,3 +409,170 @@ async def get_usage_analytics(
         ],
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+@router.post("/users/{user_id}/suspend", status_code=status.HTTP_200_OK)
+async def suspend_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """사용자 정지 (관리자 전용)"""
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다"
+        )
+
+    # 자기 자신을 정지할 수 없음
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="자기 자신을 정지할 수 없습니다"
+        )
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="사용자를 찾을 수 없습니다"
+        )
+
+    user.is_active = False
+    await db.commit()
+
+    from app.core.logging import app_logger as logger
+    logger.warning(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})를 정지시켰습니다")
+
+    return {"message": f"사용자 {user.email}이(가) 정지되었습니다"}
+
+
+@router.post("/users/{user_id}/activate", status_code=status.HTTP_200_OK)
+async def activate_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """사용자 활성화 (관리자 전용)"""
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다"
+        )
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="사용자를 찾을 수 없습니다"
+        )
+
+    user.is_active = True
+    await db.commit()
+
+    from app.core.logging import app_logger as logger
+    logger.info(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})를 활성화했습니다")
+
+    return {"message": f"사용자 {user.email}이(가) 활성화되었습니다"}
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_200_OK)
+async def delete_user(
+    user_id: int,
+    permanent: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    사용자 삭제 (관리자 전용)
+
+    - permanent=False: 소프트 삭제 (계정 비활성화)
+    - permanent=True: 하드 삭제 (데이터베이스에서 완전 삭제)
+    """
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다"
+        )
+
+    # 자기 자신을 삭제할 수 없음
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="자기 자신을 삭제할 수 없습니다"
+        )
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="사용자를 찾을 수 없습니다"
+        )
+
+    from app.core.logging import app_logger as logger
+
+    if permanent:
+        # 하드 삭제 (실제 삭제)
+        await db.delete(user)
+        await db.commit()
+        logger.critical(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})를 영구 삭제했습니다")
+        return {"message": f"사용자 {user.email}이(가) 영구 삭제되었습니다"}
+    else:
+        # 소프트 삭제 (비활성화)
+        user.is_active = False
+        await db.commit()
+        logger.warning(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})를 삭제(비활성화)했습니다")
+        return {"message": f"사용자 {user.email}이(가) 삭제되었습니다 (복구 가능)"}
+
+
+@router.put("/users/{user_id}/role", status_code=status.HTTP_200_OK)
+async def update_user_role(
+    user_id: int,
+    role: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """사용자 역할 변경 (관리자 전용)"""
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다"
+        )
+
+    if role not in ["user", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="role은 'user' 또는 'admin'이어야 합니다"
+        )
+
+    # 자기 자신의 역할을 변경할 수 없음
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="자기 자신의 역할을 변경할 수 없습니다"
+        )
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="사용자를 찾을 수 없습니다"
+        )
+
+    old_role = user.role
+    user.role = role
+    user.is_superuser = (role == "admin")
+    await db.commit()
+
+    from app.core.logging import app_logger as logger
+    logger.info(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})의 역할을 {old_role} -> {role}로 변경했습니다")
+
+    return {"message": f"사용자 {user.email}의 역할이 {role}(으)로 변경되었습니다"}
