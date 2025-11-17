@@ -9,10 +9,14 @@ from app.core.database import init_db
 from app.core.logging import app_logger as logger
 from app.core.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
 from app.core.error_handlers import register_exception_handlers
+from app.core.config_validator import validate_environment_on_startup
 from app.services.cache_service import cache
 from app.api.v1.router import api_router
 import sentry_sdk
 
+
+# 환경 설정 검증 (앱 시작 전)
+validate_environment_on_startup()
 
 # Sentry 초기화 (DSN이 설정된 경우에만)
 if settings.SENTRY_DSN:
