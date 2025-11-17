@@ -1,7 +1,7 @@
 """
 사용자 프로필 관리 API
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
@@ -10,6 +10,7 @@ from app.api.deps import get_db, get_current_user, get_current_active_user
 from app.models.user import User
 from app.schemas.user import UserResponse, UserUpdate, PasswordChange
 from app.core.security import verify_password, get_password_hash
+from app.services.audit_service import log_user_updated, log_password_changed, AuditService
 from app.core.logging import app_logger as logger
 
 router = APIRouter()
@@ -25,11 +26,15 @@ async def get_current_user_profile(
 
 @router.put("/me", response_model=UserResponse)
 async def update_user_profile(
+    request: Request,
     user_update: UserUpdate,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     """사용자 프로필 업데이트"""
+    # 변경 사항 추적
+    changes = {"old": {}, "new": {}}
+
     # 이메일 변경 시 중복 확인
     if user_update.email and user_update.email != current_user.email:
         result = await db.execute(
@@ -40,6 +45,8 @@ async def update_user_profile(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="이미 사용 중인 이메일입니다",
             )
+        changes["old"]["email"] = current_user.email
+        changes["new"]["email"] = user_update.email
         current_user.email = user_update.email
         # 이메일 변경 시 재인증 필요
         current_user.is_verified = False
@@ -55,14 +62,22 @@ async def update_user_profile(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="이미 사용 중인 사용자명입니다",
             )
+        changes["old"]["username"] = current_user.username
+        changes["new"]["username"] = user_update.username
         current_user.username = user_update.username
 
     # 기타 정보 업데이트
     if user_update.full_name is not None:
+        changes["old"]["full_name"] = current_user.full_name
+        changes["new"]["full_name"] = user_update.full_name
         current_user.full_name = user_update.full_name
 
     await db.commit()
     await db.refresh(current_user)
+
+    # 감사 로그 기록
+    if changes["new"]:  # 실제 변경사항이 있는 경우만
+        await log_user_updated(db, current_user, changes, request)
 
     logger.info(f"사용자 프로필 업데이트: {current_user.id}")
     return current_user
@@ -70,6 +85,7 @@ async def update_user_profile(
 
 @router.post("/me/change-password", status_code=status.HTTP_200_OK)
 async def change_password(
+    request: Request,
     password_change: PasswordChange,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
@@ -93,12 +109,16 @@ async def change_password(
     current_user.hashed_password = get_password_hash(password_change.new_password)
     await db.commit()
 
+    # 감사 로그 기록
+    await log_password_changed(db, current_user, request)
+
     logger.info(f"비밀번호 변경 완료: {current_user.id}")
     return {"message": "비밀번호가 성공적으로 변경되었습니다"}
 
 
 @router.delete("/me", status_code=status.HTTP_200_OK)
 async def delete_user_account(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -106,6 +126,17 @@ async def delete_user_account(
     # 소프트 삭제 (비활성화)
     current_user.is_active = False
     await db.commit()
+
+    # 감사 로그 기록
+    audit = AuditService(db)
+    await audit.log(
+        action="user.deleted",
+        user=current_user,
+        resource_type="user",
+        resource_id=current_user.id,
+        description=f"사용자 계정 삭제 (소프트): {current_user.email}",
+        request=request,
+    )
 
     logger.warning(f"사용자 계정 삭제: {current_user.id} ({current_user.email})")
     return {"message": "계정이 성공적으로 삭제되었습니다"}

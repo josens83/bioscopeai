@@ -8,6 +8,7 @@ from app.core.security import verify_password, get_password_hash, create_access_
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse, PasswordResetRequest, PasswordReset, EmailVerification
 from app.services.email_service import send_password_reset_email, send_verification_email, send_welcome_email
+from app.services.audit_service import log_user_created, log_user_login, log_password_changed
 from datetime import datetime, timedelta
 import secrets
 from app.core.logging import app_logger as logger
@@ -52,6 +53,9 @@ async def register(request: Request, user_in: UserCreate, db: AsyncSession = Dep
     await db.commit()
     await db.refresh(user)
 
+    # 감사 로그 기록
+    await log_user_created(db, user, request)
+
     # 환영 이메일 및 인증 이메일 전송
     try:
         await send_welcome_email(user.email, user.username)
@@ -87,6 +91,9 @@ async def login(request: Request, user_in: UserLogin, db: AsyncSession = Depends
     # 토큰 생성
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
+
+    # 감사 로그 기록
+    await log_user_login(db, user, request)
 
     return TokenResponse(
         access_token=access_token,
@@ -147,6 +154,9 @@ async def reset_password(request: Request, data: PasswordReset, db: AsyncSession
     user.reset_token_expires_at = None
 
     await db.commit()
+
+    # 감사 로그 기록
+    await log_password_changed(db, user, request)
 
     logger.info(f"비밀번호 재설정 완료: {user.email}")
 

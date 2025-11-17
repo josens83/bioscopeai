@@ -1,11 +1,12 @@
 """
 관리자 API 엔드포인트
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, distinct
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
+from app.services.audit_service import log_admin_action
 from app.models.paper import Paper
 from app.models.analysis import Analysis
 from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
@@ -413,6 +414,7 @@ async def get_usage_analytics(
 
 @router.post("/users/{user_id}/suspend", status_code=status.HTTP_200_OK)
 async def suspend_user(
+    request: Request,
     user_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -443,6 +445,17 @@ async def suspend_user(
     user.is_active = False
     await db.commit()
 
+    # 감사 로그 기록
+    await log_admin_action(
+        db=db,
+        admin=current_user,
+        action="user.suspended",
+        target_user=user,
+        description=f"관리자가 사용자를 정지시킴: {user.email}",
+        request=request,
+        changes={"old": {"is_active": True}, "new": {"is_active": False}},
+    )
+
     from app.core.logging import app_logger as logger
     logger.warning(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})를 정지시켰습니다")
 
@@ -451,6 +464,7 @@ async def suspend_user(
 
 @router.post("/users/{user_id}/activate", status_code=status.HTTP_200_OK)
 async def activate_user(
+    request: Request,
     user_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -474,6 +488,17 @@ async def activate_user(
     user.is_active = True
     await db.commit()
 
+    # 감사 로그 기록
+    await log_admin_action(
+        db=db,
+        admin=current_user,
+        action="user.activated",
+        target_user=user,
+        description=f"관리자가 사용자를 활성화함: {user.email}",
+        request=request,
+        changes={"old": {"is_active": False}, "new": {"is_active": True}},
+    )
+
     from app.core.logging import app_logger as logger
     logger.info(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})를 활성화했습니다")
 
@@ -482,6 +507,7 @@ async def activate_user(
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_200_OK)
 async def delete_user(
+    request: Request,
     user_id: int,
     permanent: bool = False,
     db: AsyncSession = Depends(get_db),
@@ -518,21 +544,43 @@ async def delete_user(
     from app.core.logging import app_logger as logger
 
     if permanent:
+        # 감사 로그 먼저 기록 (삭제 전에)
+        await log_admin_action(
+            db=db,
+            admin=current_user,
+            action="user.deleted_permanent",
+            target_user=user,
+            description=f"관리자가 사용자를 영구 삭제함: {user.email}",
+            request=request,
+            changes={"old": {"exists": True}, "new": {"exists": False}},
+        )
         # 하드 삭제 (실제 삭제)
+        user_email = user.email
         await db.delete(user)
         await db.commit()
-        logger.critical(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})를 영구 삭제했습니다")
-        return {"message": f"사용자 {user.email}이(가) 영구 삭제되었습니다"}
+        logger.critical(f"관리자 {current_user.id}가 사용자 {user_id} ({user_email})를 영구 삭제했습니다")
+        return {"message": f"사용자 {user_email}이(가) 영구 삭제되었습니다"}
     else:
         # 소프트 삭제 (비활성화)
         user.is_active = False
         await db.commit()
+        # 감사 로그 기록
+        await log_admin_action(
+            db=db,
+            admin=current_user,
+            action="user.deleted_soft",
+            target_user=user,
+            description=f"관리자가 사용자를 삭제(비활성화)함: {user.email}",
+            request=request,
+            changes={"old": {"is_active": True}, "new": {"is_active": False}},
+        )
         logger.warning(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})를 삭제(비활성화)했습니다")
         return {"message": f"사용자 {user.email}이(가) 삭제되었습니다 (복구 가능)"}
 
 
 @router.put("/users/{user_id}/role", status_code=status.HTTP_200_OK)
 async def update_user_role(
+    request: Request,
     user_id: int,
     role: str,
     db: AsyncSession = Depends(get_db),
@@ -571,6 +619,17 @@ async def update_user_role(
     user.role = role
     user.is_superuser = (role == "admin")
     await db.commit()
+
+    # 감사 로그 기록
+    await log_admin_action(
+        db=db,
+        admin=current_user,
+        action="user.role_changed",
+        target_user=user,
+        description=f"관리자가 사용자의 역할을 변경함: {old_role} -> {role}",
+        request=request,
+        changes={"old": {"role": old_role}, "new": {"role": role}},
+    )
 
     from app.core.logging import app_logger as logger
     logger.info(f"관리자 {current_user.id}가 사용자 {user_id} ({user.email})의 역할을 {old_role} -> {role}로 변경했습니다")

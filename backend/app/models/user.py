@@ -17,6 +17,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)  # 이메일 인증 여부
+    role = Column(String, default="user", nullable=False)  # 사용자 역할: user, admin
 
     # 비밀번호 재설정
     reset_token = Column(String, nullable=True)
@@ -34,3 +35,4 @@ class User(Base):
     papers = relationship("Paper", back_populates="user")
     analyses = relationship("Analysis", back_populates="user")
     usages = relationship("Usage", back_populates="user")
+    audit_logs = relationship("AuditLog", back_populates="user", foreign_keys="AuditLog.user_id")
