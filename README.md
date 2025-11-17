@@ -32,9 +32,16 @@ RAG(검색증강생성) 기술로 논문을 검색하고, 분석하고, 비교�
 - **트렌드 분석**: 연구 키워드 및 트렌드 시각화
 
 ### 💳 구독 서비스
-- **4가지 플랜**: Free, Basic ($9.99), Premium ($29.99), Enterprise ($99.99)
-- **Stripe 결제**: 안전한 결제 시스템
+- **3가지 플랜**: Free, Basic ($19.99), Pro ($99.99)
+- **Stripe 결제**: 안전한 결제 시스템 및 자동 웹훅 처리
+- **사용량 추적**: 플랜별 월간 사용량 자동 추적 및 제한
+- **자동 이메일**: 결제 영수증, 실패 알림, 구독 취소 확인
 - **유연한 구독**: 언제든 업그레이드/다운그레이드/취소 가능
+
+### 📊 관리자 기능
+- **비즈니스 메트릭**: MRR, ARPU, DAU/MAU, 전환율, 이탈률
+- **사용량 분석**: 총 사용량, 평균 사용량, 파워 유저 통계
+- **실시간 모니터링**: Health Check, 시스템 리소스 모니터링
 
 ### 🌐 멀티 플랫폼
 - **웹 앱**: React + TypeScript 반응형 웹
@@ -64,10 +71,11 @@ React Navigation • React Query
 expo-secure-store
 ```
 
-### Infrastructure
+### Infrastructure & DevOps
 ```
-Docker • Docker Compose • Nginx
-GitHub Actions • Alembic
+Docker • Docker Compose • Nginx • Let's Encrypt
+GitHub Actions CI/CD • Alembic • PostgreSQL Backups
+Sentry • Prometheus • Health Checks • Rate Limiting
 ```
 
 ## 🚀 빠른 시작
@@ -132,6 +140,45 @@ npm start
 ```
 
 **주의**: `mobile/app.json`의 `apiUrl`을 실제 백엔드 주소로 변경하세요.
+
+## ✅ 프로덕션 준비 상태
+
+BioscopeAI는 상용 유료 서비스 수준으로 개발되었습니다:
+
+### 🔐 보안 & 인증
+- ✅ JWT 기반 인증 시스템
+- ✅ 이메일 인증 플로우 (회원가입, 인증, 재전송)
+- ✅ 비밀번호 재설정 플로우 (토큰 기반)
+- ✅ API Rate Limiting (slowapi)
+- ✅ 환경 설정 자동 검증
+- ✅ 전역 예외 핸들러
+
+### 💰 결제 & 구독
+- ✅ Stripe 결제 완전 통합
+- ✅ 웹훅 자동 처리 (결제 성공/실패, 구독 변경)
+- ✅ 사용량 추적 및 플랜별 제한
+- ✅ 자동 이메일 알림 (영수증, 실패, 취소)
+
+### 🛠️ 운영 & 모니터링
+- ✅ 상세한 Health Check 엔드포인트
+- ✅ 데이터베이스 자동 백업/복원 스크립트
+- ✅ Sentry 에러 추적 통합
+- ✅ 관리자 비즈니스 메트릭 API
+- ✅ 시스템 리소스 모니터링
+
+### 🚀 CI/CD & 테스트
+- ✅ GitHub Actions 파이프라인
+- ✅ 자동 테스트 (pytest, coverage)
+- ✅ Docker 이미지 빌드 및 푸시
+- ✅ 린팅 및 코드 품질 체크
+
+### 📦 배포
+- ✅ Docker Compose 프로덕션 설정
+- ✅ Nginx 리버스 프록시 및 SSL
+- ✅ 포괄적인 배포 가이드 ([DEPLOYMENT.md](./docs/DEPLOYMENT.md))
+- ✅ 환경변수 템플릿 (.env.prod.example)
+
+**프로덕션 배포 가이드**: [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)
 
 ## 📊 프로젝트 구조
 
