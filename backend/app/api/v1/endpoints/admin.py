@@ -3,13 +3,15 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_, or_, distinct
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.paper import Paper
 from app.models.analysis import Analysis
-from app.models.subscription import Subscription
+from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
+from app.models.usage import Usage
 from datetime import datetime, timedelta
+from typing import Optional
 
 router = APIRouter()
 
@@ -181,4 +183,229 @@ async def get_recent_activity(
             }
             for analysis in recent_analyses
         ],
+    }
+
+
+@router.get("/business-metrics")
+async def get_business_metrics(
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    비즈니스 메트릭 조회 (관리자 전용)
+
+    - MRR (Monthly Recurring Revenue)
+    - 플랜별 사용자 분포
+    - 신규 가입자 (기간별)
+    - 활성 사용자 (DAU/MAU)
+    - 전환율 (Free -> Paid)
+    - 이탈률
+    """
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다"
+        )
+
+    time_threshold = datetime.utcnow() - timedelta(days=days)
+
+    # MRR 계산 (활성 구독 합산)
+    mrr_result = await db.execute(
+        select(func.sum(SubscriptionPlan.price)).select_from(Subscription).join(
+            SubscriptionPlan, Subscription.plan_id == SubscriptionPlan.id
+        ).where(Subscription.status == SubscriptionStatus.ACTIVE)
+    )
+    mrr = mrr_result.scalar() or 0
+
+    # 플랜별 구독 수
+    plans_result = await db.execute(
+        select(
+            SubscriptionPlan.tier,
+            func.count(Subscription.id)
+        ).select_from(Subscription).join(
+            SubscriptionPlan, Subscription.plan_id == SubscriptionPlan.id
+        ).where(
+            Subscription.status == SubscriptionStatus.ACTIVE
+        ).group_by(SubscriptionPlan.tier)
+    )
+    plan_distribution = {tier: count for tier, count in plans_result.all()}
+
+    # Free 사용자 수 (구독 없는 사용자)
+    total_users_result = await db.execute(select(func.count(User.id)))
+    total_users = total_users_result.scalar()
+
+    paid_users_result = await db.execute(
+        select(func.count(distinct(Subscription.user_id))).where(
+            Subscription.status == SubscriptionStatus.ACTIVE
+        )
+    )
+    paid_users = paid_users_result.scalar() or 0
+    free_users = total_users - paid_users
+
+    plan_distribution["free"] = free_users
+
+    # 신규 가입자 (기간별)
+    new_users_result = await db.execute(
+        select(func.count(User.id)).where(User.created_at >= time_threshold)
+    )
+    new_users = new_users_result.scalar()
+
+    # DAU (오늘 활동한 사용자)
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    dau_result = await db.execute(
+        select(func.count(distinct(Analysis.user_id))).where(
+            Analysis.created_at >= today
+        )
+    )
+    dau = dau_result.scalar()
+
+    # MAU (지난 30일 활동한 사용자)
+    last_30_days = datetime.utcnow() - timedelta(days=30)
+    mau_result = await db.execute(
+        select(func.count(distinct(Analysis.user_id))).where(
+            Analysis.created_at >= last_30_days
+        )
+    )
+    mau = mau_result.scalar()
+
+    # 전환율 (Free -> Paid)
+    conversion_rate = (paid_users / total_users * 100) if total_users > 0 else 0
+
+    # 이탈률 (기간 내 취소된 구독 / 총 활성 구독)
+    churned_result = await db.execute(
+        select(func.count(Subscription.id)).where(
+            and_(
+                Subscription.status == SubscriptionStatus.CANCELED,
+                Subscription.updated_at >= time_threshold
+            )
+        )
+    )
+    churned = churned_result.scalar()
+
+    active_subs_result = await db.execute(
+        select(func.count(Subscription.id)).where(
+            Subscription.status == SubscriptionStatus.ACTIVE
+        )
+    )
+    active_subs = active_subs_result.scalar()
+
+    churn_rate = (churned / (active_subs + churned) * 100) if (active_subs + churned) > 0 else 0
+
+    # ARPU (Average Revenue Per User)
+    arpu = (mrr / paid_users) if paid_users > 0 else 0
+
+    return {
+        "period_days": days,
+        "revenue": {
+            "mrr": float(mrr),
+            "arpu": float(arpu),
+            "currency": "USD"
+        },
+        "users": {
+            "total": total_users,
+            "free": free_users,
+            "paid": paid_users,
+            "new_in_period": new_users,
+            "conversion_rate": round(conversion_rate, 2)
+        },
+        "engagement": {
+            "dau": dau,
+            "mau": mau,
+            "dau_mau_ratio": round((dau / mau * 100) if mau > 0 else 0, 2)
+        },
+        "plan_distribution": plan_distribution,
+        "churn": {
+            "churned_subscriptions": churned,
+            "churn_rate": round(churn_rate, 2)
+        },
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@router.get("/usage-analytics")
+async def get_usage_analytics(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    사용량 분석 (관리자 전용)
+
+    - 총 사용량 (논문, RAG 쿼리)
+    - 플랜별 평균 사용량
+    - 제한 근접 사용자 수
+    """
+    if not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다"
+        )
+
+    now = datetime.utcnow()
+    current_year = now.year
+    current_month = now.month
+
+    # 이번 달 총 사용량
+    total_usage_result = await db.execute(
+        select(
+            func.sum(Usage.papers_analyzed).label("total_papers"),
+            func.sum(Usage.rag_queries).label("total_queries"),
+            func.sum(Usage.api_calls).label("total_api_calls")
+        ).where(
+            and_(
+                Usage.year == current_year,
+                Usage.month == current_month
+            )
+        )
+    )
+    total_usage = total_usage_result.first()
+
+    # 플랜별 평균 사용량
+    # 복잡한 조인이므로 간소화된 버전
+    avg_usage_result = await db.execute(
+        select(
+            func.avg(Usage.papers_analyzed).label("avg_papers"),
+            func.avg(Usage.rag_queries).label("avg_queries")
+        ).where(
+            and_(
+                Usage.year == current_year,
+                Usage.month == current_month
+            )
+        )
+    )
+    avg_usage = avg_usage_result.first()
+
+    # 사용량 많은 사용자 Top 10
+    power_users_result = await db.execute(
+        select(
+            Usage.user_id,
+            func.sum(Usage.papers_analyzed + Usage.rag_queries).label("total_activity")
+        ).where(
+            and_(
+                Usage.year == current_year,
+                Usage.month == current_month
+            )
+        ).group_by(Usage.user_id).order_by(func.sum(Usage.papers_analyzed + Usage.rag_queries).desc()).limit(10)
+    )
+    power_users = power_users_result.all()
+
+    return {
+        "period": f"{current_year}-{current_month:02d}",
+        "total_usage": {
+            "papers_analyzed": total_usage.total_papers or 0,
+            "rag_queries": total_usage.total_queries or 0,
+            "api_calls": total_usage.total_api_calls or 0
+        },
+        "average_usage": {
+            "papers_per_user": round(avg_usage.avg_papers or 0, 2),
+            "queries_per_user": round(avg_usage.avg_queries or 0, 2)
+        },
+        "power_users": [
+            {
+                "user_id": user_id,
+                "total_activity": int(activity)
+            }
+            for user_id, activity in power_users
+        ],
+        "timestamp": datetime.utcnow().isoformat()
     }

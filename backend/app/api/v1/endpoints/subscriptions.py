@@ -7,6 +7,12 @@ from app.models.user import User
 from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
 from app.schemas.subscription import SubscriptionCreate, SubscriptionResponse, SubscriptionPlanResponse
 from app.services.payment_service import payment_service
+from app.services.email_service import (
+    send_payment_receipt_email,
+    send_payment_failed_email,
+    send_subscription_cancelled_email
+)
+from app.core.logging import app_logger as logger
 from datetime import datetime
 
 router = APIRouter()
@@ -160,32 +166,137 @@ async def cancel_subscription(
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
-    """Stripe 웹훅 처리"""
+    """
+    Stripe 웹훅 처리
+
+    처리하는 이벤트:
+    - invoice.payment_succeeded: 결제 성공 (영수증 발송)
+    - invoice.payment_failed: 결제 실패 (알림 발송)
+    - customer.subscription.updated: 구독 업데이트
+    - customer.subscription.deleted: 구독 삭제
+    - customer.subscription.created: 구독 생성
+    - charge.refunded: 환불 처리
+    """
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
     try:
         event = payment_service.construct_webhook_event(payload, sig_header)
     except Exception as e:
+        logger.error(f"웹훅 검증 실패: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
 
-    # 이벤트 타입별 처리
-    if event["type"] == "customer.subscription.updated":
-        subscription_data = event["data"]["object"]
-        await update_subscription_from_stripe(db, subscription_data)
+    event_type = event["type"]
+    logger.info(f"Stripe 웹훅 수신: {event_type}, ID: {event['id']}")
 
-    elif event["type"] == "customer.subscription.deleted":
-        subscription_data = event["data"]["object"]
-        await cancel_subscription_from_stripe(db, subscription_data)
+    try:
+        # 이벤트 타입별 처리
+        if event_type == "invoice.payment_succeeded":
+            await handle_payment_succeeded(db, event["data"]["object"])
 
-    return {"status": "success"}
+        elif event_type == "invoice.payment_failed":
+            await handle_payment_failed(db, event["data"]["object"])
+
+        elif event_type == "customer.subscription.updated":
+            await handle_subscription_updated(db, event["data"]["object"])
+
+        elif event_type == "customer.subscription.deleted":
+            await handle_subscription_deleted(db, event["data"]["object"])
+
+        elif event_type == "customer.subscription.created":
+            await handle_subscription_created(db, event["data"]["object"])
+
+        elif event_type == "charge.refunded":
+            await handle_charge_refunded(db, event["data"]["object"])
+
+        else:
+            logger.info(f"처리되지 않은 이벤트 타입: {event_type}")
+
+        return {"status": "success", "event_type": event_type}
+
+    except Exception as e:
+        logger.error(f"웹훅 처리 중 오류: {event_type}, {e}", exc_info=True)
+        # 웹훅은 실패해도 200을 반환해야 재전송을 방지
+        return {"status": "error", "message": str(e)}
 
 
-async def update_subscription_from_stripe(db: AsyncSession, stripe_subscription: dict):
-    """Stripe 구독 데이터로 DB 업데이트"""
+async def handle_payment_succeeded(db: AsyncSession, invoice: dict):
+    """결제 성공 처리 - 영수증 이메일 발송"""
+    customer_id = invoice["customer"]
+    amount = invoice["amount_paid"] / 100  # cents to dollars
+    currency = invoice["currency"]
+
+    # 구독 조회
+    result = await db.execute(
+        select(Subscription).join(User).where(
+            Subscription.stripe_customer_id == customer_id,
+            Subscription.status == SubscriptionStatus.ACTIVE
+        )
+    )
+    subscription = result.scalar_one_or_none()
+
+    if subscription:
+        user = subscription.user
+        plan = subscription.plan
+
+        # 영수증 이메일 발송
+        try:
+            await send_payment_receipt_email(
+                email=user.email,
+                username=user.username,
+                plan_name=plan.tier,
+                amount=amount,
+                currency=currency,
+                transaction_id=invoice["id"]
+            )
+            logger.info(f"결제 성공 영수증 발송: {user.email}, {plan.tier}, ${amount}")
+        except Exception as e:
+            logger.error(f"영수증 이메일 발송 실패: {e}")
+
+
+async def handle_payment_failed(db: AsyncSession, invoice: dict):
+    """결제 실패 처리 - 알림 이메일 발송"""
+    customer_id = invoice["customer"]
+
+    # 구독 조회
+    result = await db.execute(
+        select(Subscription).join(User).where(
+            Subscription.stripe_customer_id == customer_id
+        )
+    )
+    subscription = result.scalar_one_or_none()
+
+    if subscription:
+        user = subscription.user
+
+        # 구독 상태 업데이트 (결제 실패 시 past_due)
+        subscription.status = SubscriptionStatus.PAST_DUE
+        await db.commit()
+
+        # 실패 이메일 발송
+        try:
+            failure_reason = invoice.get("last_payment_error", {}).get("message", "결제 처리 중 오류가 발생했습니다")
+            await send_payment_failed_email(
+                email=user.email,
+                username=user.username,
+                reason=failure_reason
+            )
+            logger.warning(f"결제 실패 알림 발송: {user.email}, {failure_reason}")
+        except Exception as e:
+            logger.error(f"결제 실패 이메일 발송 실패: {e}")
+
+
+async def handle_subscription_created(db: AsyncSession, stripe_subscription: dict):
+    """구독 생성 처리"""
+    logger.info(f"구독 생성: {stripe_subscription['id']}")
+    # 이미 create_subscription API에서 처리하므로 로깅만
+
+
+async def handle_subscription_updated(db: AsyncSession, stripe_subscription: dict):
+    """구독 업데이트 처리"""
     result = await db.execute(
         select(Subscription).where(
             Subscription.stripe_subscription_id == stripe_subscription["id"]
@@ -194,25 +305,70 @@ async def update_subscription_from_stripe(db: AsyncSession, stripe_subscription:
     subscription = result.scalar_one_or_none()
 
     if subscription:
-        subscription.status = stripe_subscription["status"]
+        old_status = subscription.status
+        new_status = stripe_subscription["status"]
+
+        subscription.status = new_status
         subscription.current_period_start = datetime.fromtimestamp(
             stripe_subscription["current_period_start"]
         )
         subscription.current_period_end = datetime.fromtimestamp(
             stripe_subscription["current_period_end"]
         )
+
+        # cancel_at_period_end 확인
+        subscription.cancel_at_period_end = stripe_subscription.get("cancel_at_period_end", False)
+
         await db.commit()
 
+        logger.info(f"구독 업데이트: {subscription.id}, {old_status} -> {new_status}")
 
-async def cancel_subscription_from_stripe(db: AsyncSession, stripe_subscription: dict):
-    """Stripe 구독 취소 처리"""
+
+async def handle_subscription_deleted(db: AsyncSession, stripe_subscription: dict):
+    """구독 삭제(취소) 처리 - 이메일 발송"""
     result = await db.execute(
-        select(Subscription).where(
+        select(Subscription).join(User).join(SubscriptionPlan).where(
             Subscription.stripe_subscription_id == stripe_subscription["id"]
         )
     )
     subscription = result.scalar_one_or_none()
 
     if subscription:
+        user = subscription.user
+        plan = subscription.plan
+
+        subscription.status = SubscriptionStatus.CANCELED
+        await db.commit()
+
+        # 취소 이메일 발송
+        try:
+            await send_subscription_cancelled_email(
+                email=user.email,
+                username=user.username,
+                plan_name=plan.tier
+            )
+            logger.info(f"구독 취소 알림 발송: {user.email}, {plan.tier}")
+        except Exception as e:
+            logger.error(f"구독 취소 이메일 발송 실패: {e}")
+
+
+async def handle_charge_refunded(db: AsyncSession, charge: dict):
+    """환불 처리"""
+    amount_refunded = charge["amount_refunded"] / 100
+    customer_id = charge["customer"]
+
+    # 구독 조회
+    result = await db.execute(
+        select(Subscription).join(User).where(
+            Subscription.stripe_customer_id == customer_id
+        ).order_by(Subscription.created_at.desc())
+    )
+    subscription = result.scalar_one_or_none()
+
+    if subscription:
+        user = subscription.user
+        logger.info(f"환불 처리: {user.email}, ${amount_refunded}")
+
+        # 환불 시 구독 취소
         subscription.status = SubscriptionStatus.CANCELED
         await db.commit()
