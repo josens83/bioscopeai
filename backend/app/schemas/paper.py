@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
+from app.schemas.base import BaseDBSchema
 
 
 class PaperSearch(BaseModel):
@@ -56,10 +57,10 @@ class PaperCreate(BaseModel):
     }
 
 
-class PaperResponse(BaseModel):
+class PaperResponse(BaseDBSchema):
     """논문 응답 스키마"""
+    # id, created_at, updated_at 자동 상속
 
-    id: int = Field(..., description="논문 ID", example=1)
     user_id: int = Field(..., description="사용자 ID", example=1)
     title: str = Field(..., description="논문 제목", example="CRISPR-Cas9 Gene Editing in Human Cells")
     authors: Optional[str] = Field(None, description="저자", example="Smith J, Lee K")
@@ -71,7 +72,6 @@ class PaperResponse(BaseModel):
     pdf_url: Optional[str] = Field(None, description="PDF URL")
     keywords: Optional[List[str]] = Field(None, description="키워드", example=["CRISPR", "gene editing"])
     source: Optional[str] = Field(None, description="출처", example="pubmed")
-    created_at: datetime = Field(..., description="생성일시", example="2024-01-01T00:00:00")
 
     model_config = {
         "from_attributes": True,
@@ -88,7 +88,8 @@ class PaperResponse(BaseModel):
                     "pubmed_id": "38123456",
                     "keywords": ["CRISPR", "gene editing"],
                     "source": "pubmed",
-                    "created_at": "2024-01-01T00:00:00"
+                    "created_at": "2024-01-01T00:00:00",
+                    "updated_at": "2024-01-01T00:00:00"
                 }
             ]
         }
@@ -98,5 +99,5 @@ class PaperResponse(BaseModel):
 class PaperUpload(BaseModel):
     """논문 업로드 스키마"""
 
-    title: Optional[str] = None
-    authors: Optional[str] = None
+    title: Optional[str] = Field(None, description="논문 제목")
+    authors: Optional[str] = Field(None, description="저자")

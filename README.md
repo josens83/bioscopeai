@@ -146,12 +146,16 @@ npm start
 BioscopeAI는 상용 유료 서비스 수준으로 개발되었습니다:
 
 ### 🔐 보안 & 인증
-- ✅ JWT 기반 인증 시스템
+- ✅ JWT 기반 인증 시스템 (Access + Refresh tokens)
+- ✅ 2단계 인증 (2FA/TOTP) 및 백업 코드
 - ✅ 이메일 인증 플로우 (회원가입, 인증, 재전송)
-- ✅ 비밀번호 재설정 플로우 (토큰 기반)
-- ✅ API Rate Limiting (slowapi)
+- ✅ 비밀번호 재설정 플로우 (토큰 기반, 1시간 유효)
+- ✅ 플랜별 Rate Limiting (Free: 10/min, Enterprise: 1000/min)
+- ✅ Redis 기반 Rate Limiting (프로덕션)
+- ✅ API 키 관리 시스템
 - ✅ 환경 설정 자동 검증
 - ✅ 전역 예외 핸들러
+- ✅ CORS, HSTS, CSP 보안 헤더
 
 ### 💰 결제 & 구독
 - ✅ Stripe 결제 완전 통합
@@ -160,11 +164,16 @@ BioscopeAI는 상용 유료 서비스 수준으로 개발되었습니다:
 - ✅ 자동 이메일 알림 (영수증, 실패, 취소)
 
 ### 🛠️ 운영 & 모니터링
-- ✅ 상세한 Health Check 엔드포인트
-- ✅ 데이터베이스 자동 백업/복원 스크립트
-- ✅ Sentry 에러 추적 통합
-- ✅ 관리자 비즈니스 메트릭 API
+- ✅ 상세한 Health Check 엔드포인트 (DB 커넥션 풀 모니터링)
+- ✅ 최적화된 데이터베이스 커넥션 풀 (pool_size=10, max_overflow=20)
+- ✅ 데이터베이스 자동 백업/복원 스크립트 (PostgreSQL pg_dump)
+- ✅ 데이터베이스 검증 및 마이그레이션 도구 (db_migrate.py)
+- ✅ Sentry 에러 추적 통합 (프로덕션 실시간 모니터링)
+- ✅ 감사 로그 (Audit Log) 시스템
+- ✅ GDPR 데이터 내보내기
+- ✅ 관리자 비즈니스 메트릭 API (MRR, ARPU, Churn Rate)
 - ✅ 시스템 리소스 모니터링
+- ✅ 구조화된 JSON 로깅
 
 ### 🚀 CI/CD & 테스트
 - ✅ GitHub Actions 파이프라인
@@ -187,14 +196,41 @@ bioscopeai/
 ├── backend/              # FastAPI 백엔드
 │   ├── app/
 │   │   ├── api/         # REST API 엔드포인트
-│   │   │   └── v1/      # API v1 (auth, papers, analysis, subscriptions)
-│   │   ├── core/        # 핵심 설정 (config, security, database)
+│   │   │   └── v1/      # API v1 (auth, papers, analysis, subscriptions, admin)
+│   │   ├── core/        # 핵심 설정
+│   │   │   ├── config.py            # 환경 설정
+│   │   │   ├── database.py          # DB 커넥션 풀
+│   │   │   ├── security.py          # 인증/암호화
+│   │   │   ├── rate_limiting.py     # Rate Limiting
+│   │   │   ├── middleware.py        # 미들웨어
+│   │   │   ├── logging.py           # 로깅
+│   │   │   └── sentry.py            # 에러 추적
+│   │   ├── constants/   # 상수 정의
+│   │   │   ├── api.py               # API 상수
+│   │   │   ├── subscription.py      # 구독 플랜
+│   │   │   └── messages.py          # 메시지 템플릿
+│   │   ├── utils/       # 유틸리티 함수
+│   │   │   ├── datetime.py          # 날짜/시간
+│   │   │   ├── validators.py        # 검증
+│   │   │   ├── formatters.py        # 포맷팅
+│   │   │   └── pagination.py        # 페이지네이션
 │   │   ├── models/      # SQLAlchemy 모델
-│   │   ├── services/    # 비즈니스 로직 (PubMed, PDF, Stripe)
+│   │   ├── services/    # 비즈니스 로직
+│   │   │   ├── pubmed_service.py    # PubMed 검색
+│   │   │   ├── pdf_service.py       # PDF 처리
+│   │   │   ├── stripe_service.py    # 결제
+│   │   │   ├── two_factor_service.py # 2FA
+│   │   │   └── password_reset_service.py
 │   │   ├── rag/         # RAG 시스템 (embeddings, vectorstore, pipeline)
 │   │   └── schemas/     # Pydantic 스키마
-│   ├── alembic/         # 데이터베이스 마이그레이션
-│   ├── scripts/         # 유틸리티 스크립트 (seed_data.py)
+│   │       ├── base.py              # BaseDBSchema, 공통 베이스
+│   │       └── responses.py         # 표준 API 응답
+│   ├── alembic/         # 데이터베이스 마이그레이션 (001-009)
+│   ├── scripts/         # 유틸리티 스크립트
+│   │   ├── seed_data.py             # 초기 데이터
+│   │   ├── db_migrate.py            # DB 검증/마이그레이션
+│   │   ├── db_backup.py             # DB 백업/복원
+│   │   └── setup_database.sh        # DB 설정 자동화
 │   └── requirements.txt
 ├── frontend/            # React 웹 앱
 │   ├── src/
@@ -248,11 +284,38 @@ STRIPE_WEBHOOK_SECRET=whsec_your-secret
 
 ## 📚 문서
 
+### 사용자 가이드
 - **[빠른 시작 가이드](./docs/QUICK_START.md)**: 5분 안에 실행
 - **[설치 가이드](./docs/SETUP.md)**: 상세한 설치 및 설정
 - **[API 문서](./docs/API.md)**: 완전한 API 레퍼런스
 - **[Swagger UI](http://localhost:8000/docs)**: 인터랙티브 API 문서
 - **[ReDoc](http://localhost:8000/redoc)**: API 문서 (대안)
+
+### 개발자 가이드
+- **[REFACTORING_GUIDE.md](./backend/REFACTORING_GUIDE.md)**: 리팩토링 가이드 및 패턴
+- **[REFACTORING_SUMMARY.md](./backend/REFACTORING_SUMMARY.md)**: 리팩토링 요약
+- **[DATABASE.md](./backend/DATABASE.md)**: 데이터베이스 운영 가이드
+- **[DEPLOYMENT.md](./docs/DEPLOYMENT.md)**: 프로덕션 배포 가이드
+
+### 아키텍처 개선 (v1.0)
+BioscopeAI는 프로덕션급 SaaS 아키텍처로 전면 리팩토링되었습니다:
+
+#### 코드 품질 개선
+- **70% 코드 중복 제거**: BaseDBSchema, 공통 유틸리티
+- **100% 타입 안전성**: Generic types, Pydantic v2
+- **일관된 API 응답**: APIResponse[T], PaginatedResponse[T]
+- **중앙화된 상수**: constants/ 모듈로 관리
+
+#### 성능 최적화
+- **데이터베이스**: 커넥션 풀 최적화 (pool_pre_ping, pool_recycle)
+- **캐싱**: Redis 기반 캐싱 전략
+- **Rate Limiting**: 플랜별 동적 제한
+
+#### 보안 강화
+- **2FA/TOTP**: pyotp 기반 2단계 인증
+- **API 키**: 프로그래밍 방식 접근
+- **감사 로그**: 모든 중요 작업 기록
+- **GDPR**: 데이터 내보내기 지원
 
 ## 🧪 개발
 

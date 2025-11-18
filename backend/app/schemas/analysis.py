@@ -1,34 +1,74 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Any
-from datetime import datetime
 from app.models.analysis import AnalysisType
+from app.schemas.base import BaseDBSchema
 
 
 class AnalysisCreate(BaseModel):
     """분석 생성 스키마"""
 
-    analysis_type: AnalysisType
-    paper_id: Optional[int] = None
-    query: Optional[str] = None
-    compared_paper_ids: Optional[List[int]] = None
+    analysis_type: AnalysisType = Field(..., description="분석 유형", example="summary")
+    paper_id: Optional[int] = Field(None, description="논문 ID (선택사항)", example=1)
+    query: Optional[str] = Field(None, description="질문 쿼리 (Q&A 타입)", example="What are the main findings?")
+    compared_paper_ids: Optional[List[int]] = Field(None, description="비교할 논문 ID 목록 (비교 타입)", example=[1, 2, 3])
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "analysis_type": "summary",
+                    "paper_id": 1
+                },
+                {
+                    "analysis_type": "qa",
+                    "paper_id": 1,
+                    "query": "What are the key findings of this study?"
+                },
+                {
+                    "analysis_type": "comparison",
+                    "compared_paper_ids": [1, 2, 3]
+                }
+            ]
+        }
+    }
 
 
-class AnalysisResponse(BaseModel):
+class AnalysisResponse(BaseDBSchema):
     """분석 응답 스키마"""
+    # id, created_at, updated_at 자동 상속
 
-    id: int
-    user_id: int
-    paper_id: Optional[int] = None
-    analysis_type: AnalysisType
-    query: Optional[str] = None
-    result: Any
-    compared_paper_ids: Optional[List[int]] = None
-    processing_time: Optional[int] = None
-    tokens_used: Optional[int] = None
-    created_at: datetime
+    user_id: int = Field(..., description="사용자 ID", example=1)
+    paper_id: Optional[int] = Field(None, description="논문 ID", example=1)
+    analysis_type: AnalysisType = Field(..., description="분석 유형", example="summary")
+    query: Optional[str] = Field(None, description="질문 쿼리", example="What are the main findings?")
+    result: Any = Field(..., description="분석 결과")
+    compared_paper_ids: Optional[List[int]] = Field(None, description="비교한 논문 ID 목록", example=[1, 2, 3])
+    processing_time: Optional[int] = Field(None, description="처리 시간 (밀리초)", example=2500)
+    tokens_used: Optional[int] = Field(None, description="사용된 토큰 수", example=1500)
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "id": 1,
+                    "user_id": 1,
+                    "paper_id": 1,
+                    "analysis_type": "summary",
+                    "query": None,
+                    "result": {
+                        "summary": "This study demonstrates...",
+                        "key_points": ["Point 1", "Point 2"]
+                    },
+                    "compared_paper_ids": None,
+                    "processing_time": 2500,
+                    "tokens_used": 1500,
+                    "created_at": "2024-01-01T00:00:00",
+                    "updated_at": "2024-01-01T00:00:00"
+                }
+            ]
+        }
+    }
 
 
 class QuestionRequest(BaseModel):

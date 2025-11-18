@@ -1,8 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.core.database import init_db
@@ -11,6 +9,7 @@ from app.core.middleware import RequestLoggingMiddleware, SecurityHeadersMiddlew
 from app.core.error_handlers import register_exception_handlers
 from app.core.config_validator import validate_environment_on_startup
 from app.core.sentry import init_sentry
+from app.core.rate_limiting import limiter, rate_limit_exceeded_handler, RateLimitMiddleware
 from app.services.cache_service import cache
 from app.api.v1.router import api_router
 
@@ -35,6 +34,12 @@ async def lifespan(app: FastAPI):
     # Redis 연결
     await cache.connect()
 
+    # Redis 기반 Rate Limiter 초기화 (프로덕션)
+    if settings.ENVIRONMENT == "production" and settings.REDIS_URL:
+        from app.core.rate_limiting import init_redis_limiter
+        await init_redis_limiter(settings.REDIS_URL)
+        logger.info("✅ Redis 기반 Rate Limiter 초기화 완료")
+
     logger.success("✅ 애플리케이션 초기화 완료")
     yield
 
@@ -42,10 +47,6 @@ async def lifespan(app: FastAPI):
     logger.info("⏹️  애플리케이션 종료 중...")
     await cache.disconnect()
     logger.success("✅ 정상 종료됨")
-
-
-# Rate Limiter 초기화
-limiter = Limiter(key_func=get_remote_address)
 
 # API 메타데이터
 description = """
@@ -150,7 +151,7 @@ register_exception_handlers(app)
 
 # Rate Limit 상태 및 핸들러 설정
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # CORS 설정
 app.add_middleware(
@@ -160,6 +161,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate Limit 헤더 미들웨어
+app.add_middleware(RateLimitMiddleware)
 
 # 보안 헤더 미들웨어
 app.add_middleware(SecurityHeadersMiddleware)
