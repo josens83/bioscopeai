@@ -15,7 +15,8 @@ class Settings(BaseSettings):
 
     # 데이터베이스
     DATABASE_URL: str
-    DATABASE_POOL_SIZE: int = 5
+    DATABASE_POOL_SIZE: int = 10  # 프로덕션 환경에 맞춰 증가
+    DATABASE_MAX_OVERFLOW: int = 20  # 최대 추가 연결 수
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"

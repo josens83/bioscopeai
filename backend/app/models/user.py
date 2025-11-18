@@ -38,3 +38,4 @@ class User(Base):
     audit_logs = relationship("AuditLog", back_populates="user", foreign_keys="AuditLog.user_id")
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
     terms_acceptances = relationship("TermsAcceptance", back_populates="user", cascade="all, delete-orphan")
+    two_factor_auth = relationship("TwoFactorAuth", back_populates="user", uselist=False, cascade="all, delete-orphan")

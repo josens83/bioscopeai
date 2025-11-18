@@ -41,9 +41,19 @@ async def detailed_health_check(db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(text("SELECT 1"))
         result.scalar()
+
+        # Connection pool 상태 확인
+        from app.core.database import engine
+        pool = engine.pool
+
         health_status["checks"]["database"] = {
             "status": "healthy",
-            "type": "postgresql",
+            "type": "postgresql" if "postgresql" in settings.DATABASE_URL else "other",
+            "pool_size": pool.size(),
+            "checked_in_connections": pool.checkedin(),
+            "checked_out_connections": pool.checkedout(),
+            "overflow_connections": pool.overflow(),
+            "total_connections": pool.size() + pool.overflow(),
         }
     except Exception as e:
         health_status["status"] = "unhealthy"
