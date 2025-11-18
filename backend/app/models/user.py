@@ -36,3 +36,4 @@ class User(Base):
     analyses = relationship("Analysis", back_populates="user")
     usages = relationship("Usage", back_populates="user")
     audit_logs = relationship("AuditLog", back_populates="user", foreign_keys="AuditLog.user_id")
+    api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
