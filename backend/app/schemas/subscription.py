@@ -9,6 +9,7 @@ class SubscriptionCreate(BaseModel):
 
     tier: SubscriptionTier
     payment_method_id: Optional[str] = None
+    promotion_code: Optional[str] = None  # 프로모션 코드 (선택)
 
 
 class SubscriptionResponse(BaseModel):

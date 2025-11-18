@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
 from app.schemas.subscription import SubscriptionCreate, SubscriptionResponse, SubscriptionPlanResponse
 from app.services.payment_service import payment_service
+from app.services.promotion_service import validate_promotion_code, PromotionCodeService
 from app.services.email_service import (
     send_payment_receipt_email,
     send_payment_failed_email,
@@ -31,10 +32,11 @@ async def list_plans(db: AsyncSession = Depends(get_db)):
 @router.post("/", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def create_subscription(
     subscription_in: SubscriptionCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """구독 생성"""
+    """구독 생성 (프로모션 코드 지원)"""
     # 플랜 조회
     result = await db.execute(
         select(SubscriptionPlan).where(
@@ -65,6 +67,29 @@ async def create_subscription(
             detail="이미 활성 구독이 있습니다",
         )
 
+    # 프로모션 코드 검증 (제공된 경우)
+    promo_code = None
+    discount_applied = 0.0
+    if subscription_in.promotion_code:
+        valid, error_msg, promo_code = await validate_promotion_code(
+            db=db,
+            code=subscription_in.promotion_code,
+            user_id=current_user.id,
+            plan_id=str(plan.id),
+            amount=plan.price,
+        )
+
+        if not valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg or "유효하지 않은 프로모션 코드입니다",
+            )
+
+        # 할인 금액 계산
+        discount_applied = await PromotionCodeService.calculate_discount(
+            promo_code, plan.price
+        )
+
     # Stripe 고객 생성 (없는 경우)
     stripe_customer_id = None
     if not hasattr(current_user, "stripe_customer_id") or not current_user.stripe_customer_id:
@@ -73,11 +98,18 @@ async def create_subscription(
             name=current_user.full_name,
         )
 
-    # Stripe 구독 생성
-    stripe_result = payment_service.create_subscription(
-        customer_id=stripe_customer_id,
-        price_id=plan.stripe_price_id,
-    )
+    # Stripe 구독 생성 (프로모션 코드가 있으면 적용)
+    if promo_code:
+        stripe_result = await PromotionCodeService.apply_to_stripe_subscription(
+            promo_code=promo_code,
+            customer_id=stripe_customer_id,
+            price_id=plan.stripe_price_id,
+        )
+    else:
+        stripe_result = payment_service.create_subscription(
+            customer_id=stripe_customer_id,
+            price_id=plan.stripe_price_id,
+        )
 
     # 구독 저장
     subscription = Subscription(
@@ -93,10 +125,25 @@ async def create_subscription(
     await db.commit()
     await db.refresh(subscription)
 
+    # 프로모션 코드 사용 기록
+    if promo_code:
+        ip_address = request.client.host if request.client else None
+        await PromotionCodeService.record_usage(
+            db=db,
+            promo_code=promo_code,
+            user_id=current_user.id,
+            discount_applied=discount_applied,
+            subscription_id=subscription.id,
+            ip_address=ip_address,
+        )
+        logger.info(f"프로모션 코드 적용: {promo_code.code}, user_id={current_user.id}, discount=${discount_applied}")
+
     return {
         "subscription_id": subscription.id,
         "client_secret": stripe_result["client_secret"],
         "status": stripe_result["status"],
+        "promotion_applied": promo_code is not None,
+        "discount_amount": discount_applied if promo_code else 0,
     }
 
 
