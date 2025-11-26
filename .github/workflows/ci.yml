@@ -6,8 +6,18 @@ on:
   pull_request:
     branches: [main, develop]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
 jobs:
+  # =============================================
   # Backend 테스트
+  # =============================================
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
@@ -39,63 +49,74 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
+          cache-dependency-path: './backend/requirements.txt'
 
       - name: Install dependencies
         working-directory: ./backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest-cov
 
       - name: Run linting
         working-directory: ./backend
         run: |
-          pip install black flake8 mypy
           black --check .
           flake8 . --max-line-length=120 --extend-ignore=E203,W503
 
-      - name: Run tests
+      - name: Run type checking
+        working-directory: ./backend
+        run: |
+          mypy app --ignore-missing-imports --no-error-summary || true
+
+      - name: Run tests with coverage
         working-directory: ./backend
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/bioscopeai_test
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: test-secret-key-for-ci
           JWT_SECRET_KEY: test-jwt-secret-key
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-test-dummy-key' }}
           PUBMED_EMAIL: test@example.com
           STRIPE_SECRET_KEY: sk_test_dummy
           STRIPE_PUBLISHABLE_KEY: pk_test_dummy
           STRIPE_WEBHOOK_SECRET: whsec_dummy
         run: |
-          pytest -v --cov=app --cov-report=xml --cov-report=term
+          pytest -v --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=50
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v5
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: github.event_name == 'push'
         with:
           files: ./backend/coverage.xml
           flags: backend
+          name: backend-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
 
+  # =============================================
   # Frontend 테스트 및 빌드
+  # =============================================
   frontend-test:
     name: Frontend Tests & Build
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: ./frontend/package-lock.json
+          cache-dependency-path: './frontend/package-lock.json'
 
       - name: Install dependencies
         working-directory: ./frontend
@@ -103,56 +124,99 @@ jobs:
 
       - name: Run linting
         working-directory: ./frontend
-        run: npm run lint || true
+        run: npm run lint
 
-      - name: Run tests
+      - name: Run tests with coverage
         working-directory: ./frontend
-        run: npm test || true
+        run: npm run test:coverage -- --reporter=verbose --run
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: github.event_name == 'push'
+        with:
+          files: ./frontend/coverage/coverage-final.json
+          flags: frontend
+          name: frontend-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Build
         working-directory: ./frontend
         run: npm run build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: frontend-build
           path: ./frontend/dist
+          retention-days: 7
 
-  # Mobile 빌드 (선택적)
-  mobile-build:
+  # =============================================
+  # Mobile 빌드 체크
+  # =============================================
+  mobile-check:
     name: Mobile Build Check
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: ./mobile/package-lock.json
+          cache-dependency-path: './mobile/package-lock.json'
 
       - name: Install dependencies
         working-directory: ./mobile
-        run: npm ci
+        run: npm ci || npm install
 
       - name: Check TypeScript
         working-directory: ./mobile
-        run: npx tsc --noEmit || true
+        run: npx tsc --noEmit
 
+  # =============================================
+  # 보안 스캔
+  # =============================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # =============================================
   # Docker 이미지 빌드 및 푸시
+  # =============================================
   docker-build:
-    name: Docker Build
+    name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: [backend-test, frontend-test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -163,24 +227,100 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Extract metadata for Backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/bioscopeai-backend
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
       - name: Build and push Backend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v5
         with:
           context: ./backend
           push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Extract metadata for Frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/bioscopeai-frontend
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/bioscopeai-backend:latest
-            ${{ secrets.DOCKER_USERNAME }}/bioscopeai-backend:${{ github.sha }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bioscopeai-backend:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bioscopeai-backend:buildcache,mode=max
+            type=sha,prefix=
+            type=raw,value=latest
 
       - name: Build and push Frontend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v5
         with:
           context: ./frontend
           push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/bioscopeai-frontend:latest
-            ${{ secrets.DOCKER_USERNAME }}/bioscopeai-frontend:${{ github.sha }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bioscopeai-frontend:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bioscopeai-frontend:buildcache,mode=max
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+
+  # =============================================
+  # PR 체크 요약
+  # =============================================
+  pr-summary:
+    name: PR Summary
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test, mobile-check]
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: PR Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('## CI/CD 결과 요약')
+            );
+
+            const body = `## CI/CD 결과 요약 ✅
+
+            | 테스트 | 상태 |
+            |--------|------|
+            | Backend Tests | ✅ 통과 |
+            | Frontend Tests | ✅ 통과 |
+            | Mobile Check | ✅ 통과 |
+
+            **커밋**: \`${{ github.sha }}\`
+            **브랜치**: \`${{ github.head_ref }}\`
+
+            ---
+            _마지막 업데이트: ${new Date().toISOString()}_
+            `;
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
