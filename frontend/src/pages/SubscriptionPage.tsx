@@ -2,10 +2,8 @@ import { useState } from 'react'
 import { useSubscription } from '../hooks/useSubscription'
 import {
   Card,
-  CardHeader,
   CardContent,
   Button,
-  Badge,
   SkeletonCard,
   ConfirmModal,
   SparklesIcon,

@@ -11,7 +11,7 @@ export type { InputProps, TextareaProps } from './Input'
 
 // Cards
 export { Card, CardHeader, CardContent, CardFooter, StatCard } from './Card'
-export type { CardProps, CardHeaderProps, CardContentProps, CardFooterProps, StatCardProps } from './Card'
+export type { CardProps, CardHeaderProps, StatCardProps } from './Card'
 
 // Badges
 export { Badge, StatusBadge, PlanBadge } from './Badge'
@@ -28,6 +28,8 @@ export {
   SkeletonListItem,
   SkeletonPaperCard,
   SkeletonChatMessage,
+  PageLoadingFallback,
+  FullPageLoading,
 } from './Skeleton'
 
 // Empty States

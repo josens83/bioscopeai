@@ -12,8 +12,8 @@ const defaultProps: Partial<SVGProps<SVGSVGElement>> = {
   stroke: 'currentColor',
 }
 
-/** Helper to create accessible icon props */
-function getIconProps(props: IconProps, size: number | string = 24) {
+/** Helper to create accessible icon props - exported for future use */
+export function getIconProps(props: IconProps, size: number | string = 24) {
   const { label, ...rest } = props
   return {
     width: size,

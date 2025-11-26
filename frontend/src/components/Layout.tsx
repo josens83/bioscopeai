@@ -116,12 +116,11 @@ export default function Layout() {
             <div className="flex items-center gap-2">
               {/* 테마 토글 */}
               <IconButton
+                icon={isDark ? <SunIcon size={20} /> : <MoonIcon size={20} />}
+                label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
                 variant="ghost"
                 onClick={toggleTheme}
-                aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
-              >
-                {isDark ? <SunIcon size={20} /> : <MoonIcon size={20} />}
-              </IconButton>
+              />
 
               {/* 사용자 정보 및 로그아웃 (데스크톱) */}
               <div className="hidden md:flex items-center gap-3">
@@ -144,13 +143,12 @@ export default function Layout() {
 
               {/* 모바일 메뉴 버튼 */}
               <IconButton
+                icon={mobileMenuOpen ? <XMarkIcon size={24} /> : <Bars3Icon size={24} />}
+                label="메뉴"
                 variant="ghost"
                 className="md:hidden"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                aria-label="메뉴"
-              >
-                {mobileMenuOpen ? <XMarkIcon size={24} /> : <Bars3Icon size={24} />}
-              </IconButton>
+              />
             </div>
           </div>
         </div>

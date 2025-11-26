@@ -12,7 +12,6 @@ import {
   SkeletonPaperCard,
   EmptyPapers,
   EmptySearchResults,
-  Modal,
   ConfirmModal,
   DocumentIcon,
   SearchIcon,

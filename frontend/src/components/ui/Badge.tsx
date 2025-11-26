@@ -1,6 +1,6 @@
 import { HTMLAttributes, forwardRef, ReactNode } from 'react'
 
-export type BadgeVariant = 'default' | 'brand' | 'accent' | 'success' | 'warning' | 'error'
+export type BadgeVariant = 'default' | 'secondary' | 'brand' | 'accent' | 'success' | 'warning' | 'error'
 export type BadgeSize = 'sm' | 'md' | 'lg'
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
@@ -12,6 +12,7 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 
 const variantStyles: Record<BadgeVariant, string> = {
   default: 'bg-surface-100 text-surface-700 dark:bg-surface-700 dark:text-surface-300',
+  secondary: 'bg-surface-200 text-surface-600 dark:bg-surface-600 dark:text-surface-300',
   brand: 'bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400',
   accent: 'bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400',
   success: 'bg-success-100 text-success-700 dark:bg-success-700/30 dark:text-success-400',
@@ -21,6 +22,7 @@ const variantStyles: Record<BadgeVariant, string> = {
 
 const dotColors: Record<BadgeVariant, string> = {
   default: 'bg-surface-500',
+  secondary: 'bg-surface-400',
   brand: 'bg-brand-500',
   accent: 'bg-accent-500',
   success: 'bg-success-500',

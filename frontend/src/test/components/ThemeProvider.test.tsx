@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ThemeProvider, useTheme } from '../../components/ui/ThemeProvider'
 
@@ -20,14 +20,14 @@ function ThemeConsumer() {
 
 describe('ThemeProvider', () => {
   const originalMatchMedia = window.matchMedia
-  let mockMatchMedia: ReturnType<typeof vi.fn>
+  let mockMatchMedia: typeof window.matchMedia
 
   beforeEach(() => {
     localStorage.clear()
     document.documentElement.classList.remove('light', 'dark')
 
     // Mock matchMedia
-    mockMatchMedia = vi.fn().mockImplementation((query: string) => ({
+    mockMatchMedia = vi.fn((query: string) => ({
       matches: query === '(prefers-color-scheme: dark)' ? false : false,
       media: query,
       onchange: null,
@@ -36,7 +36,7 @@ describe('ThemeProvider', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
-    }))
+    })) as unknown as typeof window.matchMedia
     window.matchMedia = mockMatchMedia
   })
 
@@ -141,7 +141,8 @@ describe('ThemeProvider', () => {
   })
 
   it('detects system dark mode preference', () => {
-    mockMatchMedia.mockImplementation((query: string) => ({
+    // Override matchMedia for this specific test
+    window.matchMedia = vi.fn((query: string) => ({
       matches: query === '(prefers-color-scheme: dark)',
       media: query,
       onchange: null,
@@ -150,7 +151,7 @@ describe('ThemeProvider', () => {
       addListener: vi.fn(),
       removeListener: vi.fn(),
       dispatchEvent: vi.fn(),
-    }))
+    })) as unknown as typeof window.matchMedia
 
     render(
       <ThemeProvider defaultTheme="system">

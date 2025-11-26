@@ -164,7 +164,8 @@ export function SkeletonPaperCard() {
 }
 
 // Chat Message Skeleton - 채팅 메시지용
-export function SkeletonChatMessage({ isUser = false }: { isUser?: boolean }) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function SkeletonChatMessage({ isUser = false, isAssistant: _isAssistant = false }: { isUser?: boolean; isAssistant?: boolean }) {
   return (
     <div
       className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}
@@ -174,6 +175,46 @@ export function SkeletonChatMessage({ isUser = false }: { isUser?: boolean }) {
       <div className={`flex-1 max-w-[70%] space-y-2 ${isUser ? 'items-end' : ''}`}>
         <Skeleton height={60} rounded="lg" />
         <Skeleton height={12} width={80} />
+      </div>
+    </div>
+  )
+}
+
+// Page Loading Fallback - 페이지 로딩용
+export function PageLoadingFallback() {
+  return (
+    <div
+      className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in"
+      role="status"
+      aria-label="페이지 로딩 중"
+    >
+      <div className="relative">
+        <div className="w-16 h-16 rounded-full border-4 border-surface-200 dark:border-surface-700" />
+        <div className="absolute top-0 left-0 w-16 h-16 rounded-full border-4 border-transparent border-t-brand-500 animate-spin" />
+      </div>
+      <p className="mt-4 text-sm text-surface-500 dark:text-surface-400">
+        로딩 중...
+      </p>
+    </div>
+  )
+}
+
+// Full Page Loading - 전체 페이지 로딩용
+export function FullPageLoading() {
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center bg-surface-50 dark:bg-surface-950 z-50"
+      role="status"
+      aria-label="페이지 로딩 중"
+    >
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative">
+          <div className="w-12 h-12 rounded-full border-4 border-surface-200 dark:border-surface-700" />
+          <div className="absolute top-0 left-0 w-12 h-12 rounded-full border-4 border-transparent border-t-brand-500 animate-spin" />
+        </div>
+        <p className="text-sm font-medium text-surface-600 dark:text-surface-400">
+          BioscopeAI
+        </p>
       </div>
     </div>
   )

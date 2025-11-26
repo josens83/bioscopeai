@@ -59,9 +59,7 @@ export default function DashboardPage() {
           <StatCard
             title="총 논문 수"
             value={totalPapers}
-            icon={DocumentIcon}
-            trend={totalPapers > 0 ? { value: totalPapers, isPositive: true } : undefined}
-            color="brand"
+            icon={<DocumentIcon size={24} />}
           />
         )}
 
@@ -71,9 +69,7 @@ export default function DashboardPage() {
           <StatCard
             title="총 분석 수"
             value={totalAnalyses}
-            icon={ChartBarIcon}
-            trend={totalAnalyses > 0 ? { value: totalAnalyses, isPositive: true } : undefined}
-            color="accent"
+            icon={<ChartBarIcon size={24} />}
           />
         )}
 
@@ -83,9 +79,8 @@ export default function DashboardPage() {
           <StatCard
             title="구독 플랜"
             value={subscriptionPlan}
-            subtitle={`상태: ${subscriptionStatus === 'active' ? '활성' : subscriptionStatus}`}
-            icon={SparklesIcon}
-            color="purple"
+            description={`상태: ${subscriptionStatus === 'active' ? '활성' : subscriptionStatus}`}
+            icon={<SparklesIcon size={24} />}
           />
         )}
       </div>
@@ -113,7 +108,7 @@ export default function DashboardPage() {
             {papersLoading ? (
               <div className="divide-y divide-surface-100 dark:divide-surface-700">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <SkeletonListItem key={i} showAvatar={false} />
+                  <SkeletonListItem key={i} />
                 ))}
               </div>
             ) : papers && papers.length > 0 ? (
@@ -173,7 +168,7 @@ export default function DashboardPage() {
             {analysesLoading ? (
               <div className="divide-y divide-surface-100 dark:divide-surface-700">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <SkeletonListItem key={i} showAvatar={false} />
+                  <SkeletonListItem key={i} />
                 ))}
               </div>
             ) : analyses && analyses.length > 0 ? (
