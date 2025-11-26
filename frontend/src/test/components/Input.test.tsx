@@ -63,14 +63,17 @@ describe('PasswordInput', () => {
 
     // Initially password is hidden
     expect(input).toHaveAttribute('type', 'password')
+    expect(toggleButton).toHaveAttribute('aria-pressed', 'false')
 
     // Click to show password
     await userEvent.click(toggleButton)
     expect(input).toHaveAttribute('type', 'text')
+    expect(toggleButton).toHaveAttribute('aria-pressed', 'true')
 
     // Click again to hide password
     await userEvent.click(toggleButton)
     expect(input).toHaveAttribute('type', 'password')
+    expect(toggleButton).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('renders with label', () => {

@@ -96,21 +96,28 @@ Input.displayName = 'Input'
 export interface PasswordInputProps extends Omit<InputProps, 'type' | 'rightIcon'> {}
 
 export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
-  ({ ...props }, ref) => {
+  ({ label, ...props }, ref) => {
     const [showPassword, setShowPassword] = useState(false)
 
     return (
       <div className="relative">
         <Input
           ref={ref}
+          label={label}
           type={showPassword ? 'text' : 'password'}
           {...props}
         />
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors p-1"
+          className={`
+            absolute right-3 text-surface-400 hover:text-surface-600
+            dark:hover:text-surface-300 transition-colors p-1
+            focus:outline-none focus:ring-2 focus:ring-brand-500/50 rounded
+            ${label ? 'top-[38px]' : 'top-1/2 -translate-y-1/2'}
+          `}
           aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+          aria-pressed={showPassword}
         >
           {showPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
         </button>
@@ -140,7 +147,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         ref={ref}
         type="search"
         leftIcon={
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
         }

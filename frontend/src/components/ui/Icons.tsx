@@ -2,13 +2,30 @@ import { SVGProps } from 'react'
 
 type IconProps = SVGProps<SVGSVGElement> & {
   size?: number | string
+  /** Accessible label for the icon. If not provided, icon is treated as decorative */
+  label?: string
 }
 
-const defaultProps: Partial<IconProps> = {
-  size: 24,
+const defaultProps: Partial<SVGProps<SVGSVGElement>> = {
   strokeWidth: 1.5,
   fill: 'none',
   stroke: 'currentColor',
+}
+
+/** Helper to create accessible icon props */
+function getIconProps(props: IconProps, size: number | string = 24) {
+  const { label, ...rest } = props
+  return {
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    'aria-hidden': label ? undefined : true,
+    'aria-label': label,
+    role: label ? 'img' : undefined,
+    focusable: false,
+    ...defaultProps,
+    ...rest,
+  }
 }
 
 // Document / Paper

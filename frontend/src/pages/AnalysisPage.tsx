@@ -348,7 +348,7 @@ export default function AnalysisPage() {
                     variant="primary"
                     onClick={handleQuestion}
                     disabled={!question.trim() || questionMutation.isPending}
-                    loading={questionMutation.isPending}
+                    isLoading={questionMutation.isPending}
                     className="self-end"
                   >
                     <PaperAirplaneIcon size={20} />
@@ -419,7 +419,7 @@ export default function AnalysisPage() {
                 className="w-full"
                 onClick={handleSummarize}
                 disabled={!summaryPaperId || summarizeMutation.isPending}
-                loading={summarizeMutation.isPending}
+                isLoading={summarizeMutation.isPending}
                 leftIcon={<DocumentTextIcon size={20} />}
               >
                 요약 생성
@@ -522,7 +522,7 @@ export default function AnalysisPage() {
                 className="w-full"
                 onClick={handleCompare}
                 disabled={selectedPaperIds.length < 2 || compareMutation.isPending}
-                loading={compareMutation.isPending}
+                isLoading={compareMutation.isPending}
                 leftIcon={<ArrowsRightLeftIcon size={20} />}
               >
                 비교 분석

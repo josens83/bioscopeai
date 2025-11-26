@@ -275,8 +275,8 @@ export default function RegisterPage() {
                   type="submit"
                   variant="primary"
                   size="lg"
-                  loading={loading}
-                  className="w-full"
+                  isLoading={loading}
+                  fullWidth
                 >
                   가입하기
                 </Button>

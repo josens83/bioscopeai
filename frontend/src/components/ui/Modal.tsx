@@ -1,4 +1,4 @@
-import { Fragment, ReactNode, useEffect, useCallback } from 'react'
+import { Fragment, ReactNode, useEffect, useCallback, useRef } from 'react'
 import { XIcon } from './Icons'
 import { IconButton } from './Button'
 
@@ -13,6 +13,8 @@ export interface ModalProps {
   closeOnOverlayClick?: boolean
   closeOnEscape?: boolean
   footer?: ReactNode
+  /** Initial element to focus when modal opens. If not provided, focuses the first focusable element */
+  initialFocus?: React.RefObject<HTMLElement>
 }
 
 const sizeStyles = {
@@ -22,6 +24,16 @@ const sizeStyles = {
   xl: 'max-w-xl',
   full: 'max-w-4xl',
 }
+
+// Focusable element selector
+const FOCUSABLE_SELECTOR = [
+  'button:not([disabled])',
+  '[href]',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ')
 
 export function Modal({
   isOpen,
@@ -34,7 +46,11 @@ export function Modal({
   closeOnOverlayClick = true,
   closeOnEscape = true,
   footer,
+  initialFocus,
 }: ModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null)
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null)
+
   // ESC 키 핸들링
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
@@ -45,17 +61,69 @@ export function Modal({
     [closeOnEscape, onClose]
   )
 
+  // Focus trap - Tab key handling
+  const handleTabKey = useCallback((e: KeyboardEvent) => {
+    if (e.key !== 'Tab' || !modalRef.current) return
+
+    const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+    const firstElement = focusableElements[0]
+    const lastElement = focusableElements[focusableElements.length - 1]
+
+    if (!firstElement) return
+
+    // Shift + Tab on first element -> go to last element
+    if (e.shiftKey && document.activeElement === firstElement) {
+      e.preventDefault()
+      lastElement?.focus()
+    }
+    // Tab on last element -> go to first element
+    else if (!e.shiftKey && document.activeElement === lastElement) {
+      e.preventDefault()
+      firstElement?.focus()
+    }
+  }, [])
+
+  // Store previously focused element and set initial focus
   useEffect(() => {
     if (isOpen) {
+      // Store current focus
+      previouslyFocusedRef.current = document.activeElement as HTMLElement
+
+      // Set up event listeners
       document.addEventListener('keydown', handleEscape)
+      document.addEventListener('keydown', handleTabKey)
       document.body.style.overflow = 'hidden'
+
+      // Set initial focus
+      const setInitialFocus = () => {
+        if (initialFocus?.current) {
+          initialFocus.current.focus()
+        } else if (modalRef.current) {
+          const firstFocusable = modalRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+          if (firstFocusable) {
+            firstFocusable.focus()
+          } else {
+            // If no focusable elements, focus the modal itself
+            modalRef.current.focus()
+          }
+        }
+      }
+
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(setInitialFocus)
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape)
+      document.removeEventListener('keydown', handleTabKey)
       document.body.style.overflow = ''
+
+      // Restore focus when modal closes
+      if (previouslyFocusedRef.current && typeof previouslyFocusedRef.current.focus === 'function') {
+        previouslyFocusedRef.current.focus()
+      }
     }
-  }, [isOpen, handleEscape])
+  }, [isOpen, handleEscape, handleTabKey, initialFocus])
 
   if (!isOpen) return null
 
@@ -78,6 +146,8 @@ export function Modal({
       >
         {/* Modal Content */}
         <div
+          ref={modalRef}
+          tabIndex={-1}
           className={`
             ${sizeStyles[size]}
             w-full
@@ -87,6 +157,7 @@ export function Modal({
             animate-scale-in
             max-h-[90vh] overflow-hidden
             flex flex-col
+            outline-none
           `}
           onClick={(e) => e.stopPropagation()}
         >

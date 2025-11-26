@@ -219,23 +219,21 @@ export default function PapersPage() {
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         {paper.pubmed_id && (
                           <IconButton
+                            icon={<ExternalLinkIcon size={18} />}
+                            label="PubMed에서 보기"
                             variant="ghost"
                             size="sm"
                             onClick={() => window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pubmed_id}`, '_blank')}
-                            title="PubMed에서 보기"
-                          >
-                            <ExternalLinkIcon size={18} />
-                          </IconButton>
+                          />
                         )}
                         <IconButton
+                          icon={<TrashIcon size={18} />}
+                          label="삭제"
                           variant="ghost"
                           size="sm"
                           className="text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20"
                           onClick={() => setDeleteTarget({ id: paper.id, title: paper.title })}
-                          title="삭제"
-                        >
-                          <TrashIcon size={18} />
-                        </IconButton>
+                        />
                       </div>
                     </div>
                   </CardContent>
@@ -269,7 +267,7 @@ export default function PapersPage() {
                 <Button
                   variant="primary"
                   onClick={handleSearch}
-                  loading={searchMutation.isPending}
+                  isLoading={searchMutation.isPending}
                   leftIcon={<SearchIcon size={18} />}
                 >
                   검색
@@ -319,7 +317,7 @@ export default function PapersPage() {
                         size="sm"
                         variant="primary"
                         onClick={() => handleSavePaper(paper)}
-                        loading={createMutation.isPending}
+                        isLoading={createMutation.isPending}
                         leftIcon={<PlusIcon size={16} />}
                       >
                         라이브러리에 추가
@@ -451,7 +449,7 @@ export default function PapersPage() {
                 size="lg"
                 onClick={handleFileUpload}
                 disabled={!selectedFile}
-                loading={uploadMutation.isPending}
+                isLoading={uploadMutation.isPending}
                 leftIcon={<CloudArrowUpIcon size={20} />}
               >
                 업로드
@@ -468,9 +466,9 @@ export default function PapersPage() {
         onConfirm={handleDelete}
         title="논문 삭제"
         message={`"${deleteTarget?.title}"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
-        confirmText="삭제"
+        confirmLabel="삭제"
         variant="danger"
-        loading={deleteMutation.isPending}
+        isLoading={deleteMutation.isPending}
       />
     </div>
   )

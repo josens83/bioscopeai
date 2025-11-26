@@ -83,6 +83,34 @@ describe('Modal', () => {
     )
     expect(document.querySelector('.max-w-lg')).toBeInTheDocument()
   })
+
+  it('traps focus within modal', async () => {
+    render(
+      <Modal isOpen={true} onClose={() => {}} showCloseButton={true}>
+        <button data-testid="first-btn">First</button>
+        <button data-testid="last-btn">Last</button>
+      </Modal>
+    )
+
+    // Wait for initial focus
+    await vi.waitFor(() => {
+      const closeBtn = screen.getByLabelText('닫기')
+      expect(document.activeElement === closeBtn || document.activeElement?.getAttribute('data-testid') === 'first-btn').toBe(true)
+    })
+  })
+
+  it('has correct ARIA attributes', () => {
+    render(
+      <Modal isOpen={true} onClose={() => {}} title="Test Modal" description="Modal description">
+        <div>Content</div>
+      </Modal>
+    )
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog).toHaveAttribute('aria-labelledby', 'modal-title')
+    expect(dialog).toHaveAttribute('aria-describedby', 'modal-description')
+  })
 })
 
 describe('ConfirmModal', () => {

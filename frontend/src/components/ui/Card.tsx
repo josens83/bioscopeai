@@ -1,4 +1,4 @@
-import { HTMLAttributes, forwardRef, ReactNode } from 'react'
+import { HTMLAttributes, forwardRef, ReactNode, KeyboardEvent, useCallback } from 'react'
 
 export type CardVariant = 'default' | 'elevated' | 'outlined' | 'ghost'
 
@@ -6,6 +6,8 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: CardVariant
   hover?: boolean
   padding?: 'none' | 'sm' | 'md' | 'lg'
+  /** Accessible label for clickable cards (required when onClick is provided) */
+  ariaLabel?: string
 }
 
 const variantStyles: Record<CardVariant, string> = {
@@ -43,19 +45,42 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       hover = false,
       padding = 'md',
       className = '',
+      onClick,
+      onKeyDown,
+      ariaLabel,
       ...props
     },
     ref
   ) => {
+    const isClickable = Boolean(onClick)
+
+    // Handle Enter and Space key for keyboard accessibility
+    const handleKeyDown = useCallback(
+      (e: KeyboardEvent<HTMLDivElement>) => {
+        if (isClickable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault()
+          onClick?.(e as unknown as React.MouseEvent<HTMLDivElement>)
+        }
+        onKeyDown?.(e)
+      },
+      [isClickable, onClick, onKeyDown]
+    )
+
     return (
       <div
         ref={ref}
+        role={isClickable ? 'button' : undefined}
+        tabIndex={isClickable ? 0 : undefined}
+        aria-label={ariaLabel}
+        onClick={onClick}
+        onKeyDown={handleKeyDown}
         className={`
           rounded-xl
           transition-all duration-200
           ${variantStyles[variant]}
           ${paddingStyles[padding]}
-          ${hover ? 'hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-500/20 cursor-pointer' : ''}
+          ${hover || isClickable ? 'hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-500/20 cursor-pointer' : ''}
+          ${isClickable ? 'focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:ring-offset-2' : ''}
           ${className}
         `}
         {...props}
@@ -175,8 +200,14 @@ export function StatCard({ title, value, change, icon, description, loading }: S
                   ${change.type === 'decrease' ? 'text-error-600 dark:text-error-400' : ''}
                   ${change.type === 'neutral' ? 'text-surface-500' : ''}
                 `}
+                aria-label={`${change.type === 'increase' ? '증가' : change.type === 'decrease' ? '감소' : '변동 없음'} ${change.value}%`}
               >
-                {change.type === 'increase' && '+'}{change.value}%
+                <span aria-hidden="true">
+                  {change.type === 'increase' && '↑'}
+                  {change.type === 'decrease' && '↓'}
+                  {change.type === 'neutral' && '→'}
+                </span>
+                {' '}{change.type === 'increase' && '+'}{change.value}%
               </span>
               <span className="text-xs text-surface-400">vs 지난달</span>
             </div>

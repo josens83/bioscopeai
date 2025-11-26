@@ -216,7 +216,7 @@ export default function SubscriptionPage() {
                   size="lg"
                   className="w-full"
                   disabled={isCurrentPlan || createMutation.isPending}
-                  loading={selectedPlan === plan.tier && createMutation.isPending}
+                  isLoading={selectedPlan === plan.tier && createMutation.isPending}
                   onClick={() => handleSubscribe(plan.tier)}
                 >
                   {isCurrentPlan ? '현재 플랜' : plan.price === 0 ? '무료로 시작' : '구독하기'}
@@ -259,9 +259,9 @@ export default function SubscriptionPage() {
         onConfirm={handleCancel}
         title="구독 취소"
         message="정말 구독을 취소하시겠습니까? 현재 결제 기간이 끝나면 무료 플랜으로 전환됩니다."
-        confirmText="구독 취소"
+        confirmLabel="구독 취소"
         variant="danger"
-        loading={cancelMutation.isPending}
+        isLoading={cancelMutation.isPending}
       />
     </div>
   )

@@ -197,8 +197,8 @@ export default function LoginPage() {
                   type="submit"
                   variant="primary"
                   size="lg"
-                  loading={loading}
-                  className="w-full"
+                  isLoading={loading}
+                  fullWidth
                 >
                   로그인
                 </Button>

@@ -45,6 +45,37 @@ describe('Card', () => {
     fireEvent.click(screen.getByTestId('card'))
     expect(handleClick).toHaveBeenCalledTimes(1)
   })
+
+  it('clickable card has role=button and is keyboard accessible', () => {
+    const handleClick = vi.fn()
+    render(<Card onClick={handleClick} data-testid="card">Content</Card>)
+
+    const card = screen.getByTestId('card')
+    expect(card).toHaveAttribute('role', 'button')
+    expect(card).toHaveAttribute('tabIndex', '0')
+
+    // Test Enter key
+    fireEvent.keyDown(card, { key: 'Enter' })
+    expect(handleClick).toHaveBeenCalledTimes(1)
+
+    // Test Space key
+    fireEvent.keyDown(card, { key: ' ' })
+    expect(handleClick).toHaveBeenCalledTimes(2)
+  })
+
+  it('clickable card supports aria-label', () => {
+    render(<Card onClick={() => {}} ariaLabel="View paper details" data-testid="card">Content</Card>)
+
+    expect(screen.getByTestId('card')).toHaveAttribute('aria-label', 'View paper details')
+  })
+
+  it('non-clickable card does not have button role', () => {
+    render(<Card data-testid="card">Content</Card>)
+
+    const card = screen.getByTestId('card')
+    expect(card).not.toHaveAttribute('role')
+    expect(card).not.toHaveAttribute('tabIndex')
+  })
 })
 
 describe('CardHeader', () => {
@@ -117,12 +148,17 @@ describe('StatCard', () => {
 
   it('renders with positive change', () => {
     render(<StatCard title="Papers" value={10} change={{ value: 12, type: 'increase' }} />)
-    expect(screen.getByText('+12%')).toBeInTheDocument()
+    // The change indicator includes arrow and percentage
+    const changeElement = screen.getByLabelText('증가 12%')
+    expect(changeElement).toBeInTheDocument()
+    expect(changeElement.textContent).toContain('+12%')
   })
 
   it('renders with negative change', () => {
     render(<StatCard title="Papers" value={10} change={{ value: 5, type: 'decrease' }} />)
-    expect(screen.getByText('5%')).toBeInTheDocument()
+    const changeElement = screen.getByLabelText('감소 5%')
+    expect(changeElement).toBeInTheDocument()
+    expect(changeElement.textContent).toContain('5%')
   })
 
   it('renders string value', () => {
