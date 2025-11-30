@@ -1,7 +1,7 @@
 # ========================================
 # Stage 1: Build - 프로덕션 빌드
 # ========================================
-FROM node:18-alpine AS builder
+FROM node:25-alpine AS builder
 
 WORKDIR /app
 
