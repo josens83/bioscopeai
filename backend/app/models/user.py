@@ -16,6 +16,17 @@ class User(Base):
     full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
+    is_verified = Column(Boolean, default=False)  # 이메일 인증 여부
+    role = Column(String, default="user", nullable=False)  # 사용자 역할: user, admin
+
+    # 비밀번호 재설정
+    reset_token = Column(String, nullable=True)
+    reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    # 이메일 인증
+    verification_token = Column(String, nullable=True)
+    verified_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -23,3 +34,8 @@ class User(Base):
     subscriptions = relationship("Subscription", back_populates="user")
     papers = relationship("Paper", back_populates="user")
     analyses = relationship("Analysis", back_populates="user")
+    usages = relationship("Usage", back_populates="user")
+    audit_logs = relationship("AuditLog", back_populates="user", foreign_keys="AuditLog.user_id")
+    api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
+    terms_acceptances = relationship("TermsAcceptance", back_populates="user", cascade="all, delete-orphan")
+    two_factor_auth = relationship("TwoFactorAuth", back_populates="user", uselist=False, cascade="all, delete-orphan")

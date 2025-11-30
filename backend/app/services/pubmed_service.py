@@ -3,20 +3,29 @@ from datetime import datetime
 from Bio import Entrez
 import requests
 from app.core.config import settings
+from app.core.logging import app_logger as logger
 
 
 class PubMedService:
     """PubMed API 서비스"""
 
-    def __init__(self):
+    def __init__(self, cache=None):
         Entrez.email = settings.PUBMED_EMAIL
         if settings.PUBMED_API_KEY:
             Entrez.api_key = settings.PUBMED_API_KEY
+        self.cache = cache
 
-    def search_papers(
+    async def search_papers(
         self, query: str, max_results: int = 20, sort: str = "relevance"
     ) -> List[dict]:
-        """논문 검색"""
+        """논문 검색 (캐싱 지원)"""
+        # 캐시 확인
+        if self.cache:
+            cached = await self.cache.get_pubmed_search(query, max_results)
+            if cached:
+                logger.info(f"PubMed 검색 캐시 HIT: {query}")
+                return cached
+
         try:
             # 검색 실행
             handle = Entrez.esearch(
@@ -34,10 +43,16 @@ class PubMedService:
                 return []
 
             # 논문 상세 정보 가져오기
-            return self.fetch_papers_by_ids(id_list)
+            results = self.fetch_papers_by_ids(id_list)
+
+            # 캐시에 저장 (1시간)
+            if self.cache:
+                await self.cache.set_pubmed_search(query, max_results, results, expire=3600)
+
+            return results
 
         except Exception as e:
-            print(f"PubMed 검색 오류: {e}")
+            logger.error(f"PubMed 검색 오류: {e}")
             return []
 
     def fetch_papers_by_ids(self, pubmed_ids: List[str]) -> List[dict]:

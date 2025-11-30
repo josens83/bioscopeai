@@ -7,7 +7,9 @@ from app.models.user import User
 from app.models.paper import Paper
 from app.models.analysis import Analysis, AnalysisType
 from app.schemas.analysis import AnalysisCreate, AnalysisResponse, QuestionRequest, ComparisonRequest
-from app.rag.rag_pipeline import rag_pipeline
+from app.rag.rag_pipeline import RAGPipeline
+from app.services.cache_service import cache
+from app.services.usage_service import UsageService
 import time
 
 router = APIRouter()
@@ -19,8 +21,11 @@ async def ask_question(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """논문에 대한 질문"""
+    """논문에 대한 질문 (캐싱 지원, 사용량 추적)"""
     start_time = time.time()
+
+    # 사용량 확인 및 증가 (제한 초과 시 HTTPException 발생)
+    await UsageService.check_and_increment(db, current_user.id, "rag_query")
 
     # paper_id가 제공된 경우 권한 확인
     if request.paper_id:
@@ -37,7 +42,8 @@ async def ask_question(
                 detail="논문을 찾을 수 없습니다",
             )
 
-    # RAG 파이프라인으로 답변 생성
+    # RAG 파이프라인으로 답변 생성 (캐싱 지원)
+    rag_pipeline = RAGPipeline(cache=cache)
     result = await rag_pipeline.answer_question(
         question=request.question,
         paper_id=request.paper_id,

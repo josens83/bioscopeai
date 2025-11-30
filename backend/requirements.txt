@@ -1,5 +1,5 @@
 # FastAPI 및 웹 프레임워크
-fastapi==0.109.0
+fastapi==0.121.2
 uvicorn[standard]==0.27.0
 pydantic==2.5.3
 pydantic-settings==2.1.0
@@ -9,7 +9,7 @@ python-multipart==0.0.6
 sqlalchemy==2.0.25
 asyncpg==0.29.0
 alembic==1.13.1
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.11
 
 # Redis
 redis==5.0.1
@@ -19,13 +19,13 @@ aioredis==2.0.1
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-dotenv==1.0.0
-bcrypt==4.1.2
+bcrypt==5.0.0
 
 # AI/ML 및 RAG
 langchain==0.1.0
 langchain-openai==0.0.2
 openai==1.7.2
-faiss-cpu==1.7.4
+faiss-cpu==1.12.0
 sentence-transformers==2.2.2
 transformers==4.36.2
 torch==2.1.2
@@ -35,25 +35,30 @@ PyMuPDF==1.23.8
 pypdf==3.17.4
 
 # PubMed API
-biopython==1.83
+biopython==1.86
 requests==2.31.0
 httpx==0.26.0
 
 # 유료 결제
-stripe==7.10.0
+stripe==13.2.0
 
 # 유틸리티
 python-dateutil==2.8.2
 pytz==2023.3.post1
-tenacity==8.2.3
+tenacity==9.1.2
+psutil==5.9.8
+
+# 이메일
+fastapi-mail==1.4.1
 
 # 모니터링 및 로깅
 loguru==0.7.2
 slowapi==0.1.9
+sentry-sdk[fastapi]==1.40.0
 
 # 개발 도구
-pytest==7.4.4
-pytest-asyncio==1.3.0
+pytest==9.0.1
+pytest-asyncio==0.23.3
 black==23.12.1
-flake8==7.0.0
+flake8==7.3.0
 mypy==1.8.0

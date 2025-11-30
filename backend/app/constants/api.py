@@ -1,0 +1,29 @@
+"""
+API 관련 상수
+"""
+
+# API 버전
+API_V1_PREFIX = "/api/v1"
+
+# 페이지네이션
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
+MIN_PAGE = 1
+
+# Rate Limiting
+RATE_LIMIT_PER_MINUTE = 60
+RATE_LIMIT_PER_HOUR = 1000
+
+# Timeout
+REQUEST_TIMEOUT_SECONDS = 30
+DB_QUERY_TIMEOUT_SECONDS = 10
+
+# File Upload
+MAX_FILE_SIZE_MB = 10
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+ALLOWED_FILE_EXTENSIONS = [".pdf", ".txt", ".md"]
+
+# Cache TTL (seconds)
+CACHE_TTL_SHORT = 300  # 5 minutes
+CACHE_TTL_MEDIUM = 3600  # 1 hour
+CACHE_TTL_LONG = 86400  # 1 day

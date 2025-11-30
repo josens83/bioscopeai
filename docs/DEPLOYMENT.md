@@ -19,8 +19,10 @@
 - [ ] SSL/TLS 인증서 (Let's Encrypt 권장)
 - [ ] OpenAI API 키
 - [ ] Stripe 프로덕션 키 (결제 기능 사용 시)
+- [ ] SMTP 서버 설정 (Gmail 또는 SendGrid 권장) - 결제 이메일 발송에 필수
 - [ ] PubMed API 이메일 등록
 - [ ] 데이터베이스 백업 전략 수립
+- [ ] Sentry 계정 (선택사항, 에러 추적용)
 
 ### 환경 변수 설정
 
@@ -33,6 +35,38 @@ vim .env.prod
 ```
 
 **중요**: 모든 SECRET_KEY는 최소 32자 이상의 강력한 랜덤 문자열로 설정하세요.
+
+### 시스템 주요 기능
+
+BioscopeAI는 다음 프로덕션 기능을 포함합니다:
+
+#### 📊 사용량 추적 및 제한
+- 플랜별 월간 사용량 자동 추적 (논문 분석, RAG 쿼리, API 호출)
+- 사용량 한도 도달 시 자동 차단 및 업그레이드 안내
+- 실시간 사용량 조회 API
+
+#### 💳 Stripe 결제 통합
+- Basic ($19.99/월), Pro ($99.99/월) 구독 플랜
+- 자동 결제 처리 및 웹훅 이벤트 처리
+- 결제 실패 시 자동 이메일 알림
+- 환불 처리 자동화
+
+#### 📧 자동 이메일 알림
+- 결제 영수증 발송
+- 결제 실패 알림
+- 구독 취소 확인
+- 웰컴 이메일 (선택사항)
+
+#### 🛡️ 보안 및 에러 처리
+- 전역 예외 핸들러로 일관된 에러 응답
+- Sentry 통합으로 실시간 에러 추적
+- 환경 설정 자동 검증 (시작 시)
+- Rate limiting 및 보안 헤더 적용
+
+#### 📈 관리자 대시보드
+- 비즈니스 메트릭 (MRR, ARPU, DAU/MAU, 전환율, 이탈률)
+- 사용량 분석 (총 사용량, 평균 사용량, 파워 유저)
+- 사용자 통계
 
 ## Docker Compose 배포
 
@@ -103,15 +137,90 @@ docker-compose -f docker-compose.prod.yml logs -f
 # 마이그레이션 실행
 docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
 
-# 초기 데이터 생성
-docker-compose -f docker-compose.prod.yml exec backend python scripts/seed_data.py
+# 초기 데이터 생성 (플랜, 데모 계정, 관리자 계정)
+docker-compose -f docker-compose.prod.yml exec backend python -m scripts.seed_data
 ```
 
-### 8. 접속 확인
+초기 데이터에는 다음이 포함됩니다:
+- **플랜 제한**: Free, Basic, Pro 플랜별 사용량 제한
+- **구독 플랜**: Stripe 연동을 위한 플랜 데이터 (stripe_price_id는 나중에 업데이트 필요)
+- **데모 계정**: `demo@bioscopeai.com / demo1234`
+- **관리자 계정**: `admin@bioscopeai.com / admin1234` (⚠️ 프로덕션에서 반드시 비밀번호 변경)
+
+### 8. Stripe 설정
+
+```bash
+# Stripe 대시보드에서 Product 생성
+# 1. https://dashboard.stripe.com/products 접속
+# 2. "Add Product" 클릭
+# 3. Basic Plan - $19.99/month
+# 4. Pro Plan - $99.99/month
+# 5. 각 플랜의 Price ID 복사
+
+# 데이터베이스의 stripe_price_id 업데이트
+docker-compose -f docker-compose.prod.yml exec -T db psql -U postgres bioscopeai <<EOF
+UPDATE subscription_plans SET stripe_price_id = 'price_xxx' WHERE tier = 'basic';
+UPDATE subscription_plans SET stripe_price_id = 'price_yyy' WHERE tier = 'pro';
+EOF
+
+# Stripe 웹훅 설정
+# 1. https://dashboard.stripe.com/webhooks 접속
+# 2. "Add endpoint" 클릭
+# 3. URL: https://yourdomain.com/api/v1/subscriptions/webhook
+# 4. Events to send:
+#    - invoice.payment_succeeded
+#    - invoice.payment_failed
+#    - customer.subscription.created
+#    - customer.subscription.updated
+#    - customer.subscription.deleted
+#    - charge.refunded
+# 5. Webhook Secret 복사하여 .env.prod의 STRIPE_WEBHOOK_SECRET에 설정
+```
+
+### 9. SMTP 이메일 설정 검증
+
+결제 영수증, 결제 실패, 구독 취소 등의 이메일이 자동으로 발송됩니다.
+
+```bash
+# 테스트 이메일 발송 (Python 셸에서)
+docker-compose -f docker-compose.prod.yml exec backend python
+>>> from app.services.email_service import send_email
+>>> import asyncio
+>>> asyncio.run(send_email("test@example.com", "Test Email", "This is a test"))
+```
+
+**Gmail 앱 비밀번호 생성 방법:**
+1. Google 계정 관리 > 보안
+2. 2단계 인증 활성화
+3. 앱 비밀번호 생성
+4. 생성된 16자리 비밀번호를 SMTP_PASSWORD에 설정
+
+### 10. Sentry 에러 추적 설정 (선택사항)
+
+```bash
+# 1. https://sentry.io 가입
+# 2. 새 프로젝트 생성 (Python/FastAPI)
+# 3. DSN 복사
+# 4. .env.prod에 SENTRY_DSN 설정
+# 5. 재시작
+docker-compose -f docker-compose.prod.yml restart backend
+```
+
+### 11. 접속 확인
 
 ```
 https://yourdomain.com
+https://yourdomain.com/docs  # API 문서
+https://yourdomain.com/api/v1/health  # Health check
 ```
+
+**데모 계정으로 로그인:**
+- 이메일: demo@bioscopeai.com
+- 비밀번호: demo1234
+
+**관리자 대시보드:**
+- 이메일: admin@bioscopeai.com
+- 비밀번호: admin1234 (⚠️ 즉시 변경하세요)
 
 ## AWS 배포
 
