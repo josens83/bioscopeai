@@ -100,10 +100,34 @@ tags_metadata = [
     {
         "name": "health",
         "description": "시스템 상태 확인 (Health Check, Readiness, Liveness)",
+        "externalDocs": {
+            "description": "Health Check 가이드",
+            "url": "https://github.com/josens83/bioscopeai#health-check",
+        },
     },
     {
         "name": "auth",
         "description": "사용자 인증 및 등록 (회원가입, 로그인, 비밀번호 재설정, 이메일 인증)",
+    },
+    {
+        "name": "users",
+        "description": "사용자 프로필 관리 (정보 조회, 수정, 비밀번호 변경)",
+    },
+    {
+        "name": "api-keys",
+        "description": "API 키 관리 (개발자용 API 접근 키 생성, 관리)",
+    },
+    {
+        "name": "terms",
+        "description": "서비스 이용약관 동의 관리",
+    },
+    {
+        "name": "promotions",
+        "description": "프로모션 코드 및 할인 관리",
+    },
+    {
+        "name": "2fa",
+        "description": "2단계 인증 설정 (TOTP 기반 보안 강화)",
     },
     {
         "name": "papers",
@@ -144,7 +168,112 @@ app = FastAPI(
         "name": "MIT",
         "url": "https://opensource.org/licenses/MIT",
     },
+    servers=[
+        {"url": "http://localhost:8000", "description": "로컬 개발 서버"},
+        {"url": "https://staging.bioscopeai.com", "description": "스테이징 서버"},
+        {"url": "https://api.bioscopeai.com", "description": "프로덕션 서버"},
+    ],
 )
+
+
+# OpenAPI 스키마 커스터마이징 (JWT 인증 추가)
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = app.openapi()
+
+    # Security Schemes 추가
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "JWT 액세스 토큰을 입력하세요. `/api/v1/auth/login`에서 토큰을 획득할 수 있습니다.",
+        },
+        "APIKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key",
+            "description": "API 키를 입력하세요. 개발자 설정에서 API 키를 생성할 수 있습니다.",
+        },
+    }
+
+    # 전역 보안 요구사항 (기본값)
+    openapi_schema["security"] = [{"BearerAuth": []}]
+
+    # 에러 응답 스키마 추가
+    openapi_schema["components"]["schemas"]["ErrorResponse"] = {
+        "type": "object",
+        "properties": {
+            "error": {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "에러 메시지"},
+                    "code": {"type": "string", "description": "에러 코드"},
+                    "details": {"type": "object", "description": "추가 상세 정보"},
+                },
+                "required": ["message", "code"],
+            }
+        },
+        "example": {
+            "error": {
+                "message": "인증이 필요합니다.",
+                "code": "Unauthorized",
+                "details": None,
+            }
+        },
+    }
+
+    openapi_schema["components"]["schemas"]["ValidationErrorResponse"] = {
+        "type": "object",
+        "properties": {
+            "error": {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"},
+                    "code": {"type": "string"},
+                    "details": {
+                        "type": "object",
+                        "properties": {
+                            "validation_errors": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field": {"type": "string"},
+                                        "message": {"type": "string"},
+                                        "type": {"type": "string"},
+                                    },
+                                },
+                            }
+                        },
+                    },
+                },
+            }
+        },
+        "example": {
+            "error": {
+                "message": "입력값 검증에 실패했습니다.",
+                "code": "ValidationError",
+                "details": {
+                    "validation_errors": [
+                        {
+                            "field": "body.email",
+                            "message": "value is not a valid email address",
+                            "type": "value_error.email",
+                        }
+                    ]
+                },
+            }
+        },
+    }
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 # 전역 예외 핸들러 등록
 register_exception_handlers(app)

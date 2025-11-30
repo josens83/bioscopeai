@@ -1,0 +1,109 @@
+name: 🐛 버그 리포트
+description: 버그를 발견하셨나요? 알려주세요!
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        버그 리포트를 작성해주셔서 감사합니다! 🙏
+        가능한 자세히 작성해주시면 빠른 해결에 도움이 됩니다.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 버그 설명
+      description: 어떤 버그인지 명확하게 설명해주세요
+      placeholder: 버그에 대한 설명을 작성해주세요
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 방법
+      description: 버그를 재현하기 위한 단계를 알려주세요
+      placeholder: |
+        1. '...'으로 이동
+        2. '...'을 클릭
+        3. '...'까지 스크롤
+        4. 오류 확인
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 예상 동작
+      description: 어떻게 동작해야 한다고 생각하시나요?
+      placeholder: 예상한 동작을 설명해주세요
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 실제 동작
+      description: 실제로는 어떻게 동작했나요?
+      placeholder: 실제 동작을 설명해주세요
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 심각도
+      description: 이 버그가 얼마나 심각한가요?
+      options:
+        - 낮음 - 불편하지만 사용 가능
+        - 보통 - 일부 기능이 작동하지 않음
+        - 높음 - 주요 기능이 작동하지 않음
+        - 심각 - 전체 서비스 사용 불가
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 플랫폼
+      description: 어떤 플랫폼에서 발생했나요?
+      multiple: true
+      options:
+        - 웹 (Chrome)
+        - 웹 (Firefox)
+        - 웹 (Safari)
+        - 웹 (Edge)
+        - iOS 앱
+        - Android 앱
+        - 기타
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 환경
+      description: 환경 정보를 알려주세요
+      placeholder: |
+        - OS: [예: macOS 14.0, Windows 11]
+        - 브라우저 버전: [예: Chrome 120]
+        - 기타 관련 정보
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 스크린샷
+      description: 스크린샷이나 에러 로그가 있다면 첨부해주세요
+      placeholder: 여기에 이미지를 드래그하거나 붙여넣기 하세요
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 추가 정보
+      description: 다른 추가할 내용이 있나요?
+    validations:
+      required: false

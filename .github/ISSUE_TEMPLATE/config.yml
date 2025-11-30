@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 질문하기
+    url: https://github.com/josens83/bioscopeai/discussions
+    about: 질문은 GitHub Discussions를 이용해주세요
+  - name: 📚 문서
+    url: https://bioscopeai.com/docs
+    about: 문서를 먼저 확인해보세요

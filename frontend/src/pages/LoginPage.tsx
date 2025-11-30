@@ -2,6 +2,18 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { authAPI } from '../services/api'
 import { useAuthStore } from '../store/authStore'
+import {
+  Input,
+  PasswordInput,
+  Button,
+  Card,
+  CardContent,
+  InlineError,
+  BeakerIcon,
+  SparklesIcon,
+  ShieldCheckIcon,
+  ChartBarIcon,
+} from '../components/ui'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -20,8 +32,6 @@ export default function LoginPage() {
       const response = await authAPI.login({ email, password })
       const { access_token, refresh_token } = response.data
 
-      // 사용자 정보는 토큰에서 디코딩하거나 별도 API 호출로 가져와야 함
-      // 여기서는 간단히 이메일로 설정
       setAuth(
         { id: 1, email, username: email.split('@')[0] },
         access_token,
@@ -36,61 +46,177 @@ export default function LoginPage() {
     }
   }
 
+  const features = [
+    {
+      icon: BeakerIcon,
+      title: 'AI 기반 논문 분석',
+      description: 'GPT-4를 활용한 심층 논문 분석',
+    },
+    {
+      icon: ChartBarIcon,
+      title: '논문 비교 분석',
+      description: '여러 논문을 한눈에 비교',
+    },
+    {
+      icon: SparklesIcon,
+      title: 'RAG 기술',
+      description: '정확한 정보 검색 및 요약',
+    },
+    {
+      icon: ShieldCheckIcon,
+      title: '보안 우선',
+      description: '안전한 데이터 관리',
+    },
+  ]
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            BioscopeAI
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            생물의학 논문 분석 플랫폼
+    <div className="min-h-screen flex bg-surface-50 dark:bg-surface-950">
+      {/* Left Panel - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 xl:w-[55%] bg-gradient-to-br from-brand-600 via-brand-500 to-accent-500 p-12 flex-col justify-between relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-white rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-white rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+              <BeakerIcon size={24} className="text-white" />
+            </div>
+            <span className="text-2xl font-bold text-white">BioscopeAI</span>
+          </div>
+        </div>
+
+        <div className="relative z-10 space-y-8">
+          <div>
+            <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight">
+              생물의학 논문 분석의
+              <br />
+              <span className="text-brand-200">새로운 패러다임</span>
+            </h1>
+            <p className="mt-4 text-lg text-white/80 max-w-md">
+              AI 기반 논문 분석 플랫폼으로 연구 효율을 극대화하세요.
+              PubMed 검색부터 AI 분석까지 한 곳에서.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {features.map((feature, index) => (
+              <div
+                key={index}
+                className="p-4 rounded-xl bg-white/10 backdrop-blur border border-white/20"
+              >
+                <feature.icon size={24} className="text-white mb-2" />
+                <h3 className="font-semibold text-white">{feature.title}</h3>
+                <p className="text-sm text-white/70 mt-1">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="relative z-10">
+          <p className="text-sm text-white/60">
+            &copy; 2024 BioscopeAI. All rights reserved.
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <input
-                type="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="이메일"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+      </div>
+
+      {/* Right Panel - Login Form */}
+      <div className="w-full lg:w-1/2 xl:w-[45%] flex items-center justify-center p-6 sm:p-12">
+        <div className="w-full max-w-md space-y-8">
+          {/* Mobile Logo */}
+          <div className="lg:hidden text-center">
+            <div className="inline-flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-brand-500 flex items-center justify-center">
+                <BeakerIcon size={24} className="text-white" />
+              </div>
+              <span className="text-2xl font-bold text-surface-900 dark:text-surface-50">
+                BioscopeAI
+              </span>
             </div>
-            <div>
-              <input
-                type="password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="비밀번호"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+            <p className="mt-2 text-surface-500 dark:text-surface-400">
+              생물의학 논문 분석 플랫폼
+            </p>
           </div>
 
-          {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
-          )}
+          {/* Welcome Text */}
+          <div className="text-center lg:text-left">
+            <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-50">
+              다시 오신 것을 환영합니다
+            </h2>
+            <p className="mt-2 text-surface-500 dark:text-surface-400">
+              계정에 로그인하여 논문 분석을 시작하세요
+            </p>
+          </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+          {/* Login Form */}
+          <Card className="border-0 shadow-xl dark:bg-surface-900">
+            <CardContent className="p-6">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <Input
+                  label="이메일"
+                  type="email"
+                  placeholder="example@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+
+                <PasswordInput
+                  label="비밀번호"
+                  placeholder="비밀번호를 입력하세요"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+
+                {error && <InlineError message={error} />}
+
+                <div className="flex items-center justify-between text-sm">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-surface-300 text-brand-500 focus:ring-brand-500"
+                    />
+                    <span className="text-surface-600 dark:text-surface-400">
+                      로그인 상태 유지
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    className="text-brand-600 dark:text-brand-400 hover:underline"
+                  >
+                    비밀번호 찾기
+                  </button>
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  isLoading={loading}
+                  fullWidth
+                >
+                  로그인
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Sign Up Link */}
+          <p className="text-center text-surface-600 dark:text-surface-400">
+            계정이 없으신가요?{' '}
+            <Link
+              to="/register"
+              className="text-brand-600 dark:text-brand-400 font-medium hover:underline"
             >
-              {loading ? '로그인 중...' : '로그인'}
-            </button>
-          </div>
-
-          <div className="text-center text-sm">
-            <Link to="/register" className="text-primary-600 hover:text-primary-500">
-              계정이 없으신가요? 회원가입
+              회원가입
             </Link>
-          </div>
-        </form>
+          </p>
+        </div>
       </div>
     </div>
   )

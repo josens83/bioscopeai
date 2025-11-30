@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { BrowserRouter } from 'react-router-dom'
+import { render } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from '../App'
 
@@ -14,11 +13,10 @@ const queryClient = new QueryClient({
 
 describe('App', () => {
   it('renders without crashing', () => {
+    // App already includes its own Router, ThemeProvider, and ToastProvider
     render(
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <App />
       </QueryClientProvider>
     )
     expect(document.body).toBeTruthy()

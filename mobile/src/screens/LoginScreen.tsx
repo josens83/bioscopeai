@@ -2,26 +2,41 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { authAPI } from '../services/api';
 import { useAuthStore } from '../store/authStore';
+import { Button, Input, PasswordInput, useTheme, spacing, typography, borderRadius } from '../components';
 
 export default function LoginScreen({ navigation }: any) {
+  const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const setAuth = useAuthStore((state) => state.setAuth);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('오류', '이메일과 비밀번호를 입력해주세요');
-      return;
+  const validate = () => {
+    const newErrors: typeof errors = {};
+    if (!email) {
+      newErrors.email = '이메일을 입력해주세요';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = '유효한 이메일을 입력해주세요';
     }
+    if (!password) {
+      newErrors.password = '비밀번호를 입력해주세요';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleLogin = async () => {
+    if (!validate()) return;
 
     setLoading(true);
     try {
@@ -33,101 +48,142 @@ export default function LoginScreen({ navigation }: any) {
         access_token
       );
     } catch (error: any) {
-      Alert.alert('로그인 실패', error.response?.data?.detail || '로그인에 실패했습니다');
+      Alert.alert(
+        '로그인 실패',
+        error.response?.data?.detail || '로그인에 실패했습니다. 다시 시도해주세요.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>BioscopeAI</Text>
-        <Text style={styles.subtitle}>생물의학 논문 분석 플랫폼</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="이메일"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="비밀번호"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleLogin}
-          disabled={loading}
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>로그인</Text>
-          )}
-        </TouchableOpacity>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={[styles.logoContainer, { backgroundColor: theme.colors.primary }]}>
+              <Text style={styles.logoText}>🔬</Text>
+            </View>
+            <Text style={[styles.title, { color: theme.colors.text }]}>
+              BioscopeAI
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+              AI 기반 생물의학 논문 분석 플랫폼
+            </Text>
+          </View>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-          <Text style={styles.link}>계정이 없으신가요? 회원가입</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+          {/* Form */}
+          <View style={styles.form}>
+            <Input
+              label="이메일"
+              placeholder="example@email.com"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+              }}
+              error={errors.email}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
+
+            <PasswordInput
+              label="비밀번호"
+              placeholder="비밀번호를 입력하세요"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+              }}
+              error={errors.password}
+              autoComplete="password"
+            />
+
+            <Button
+              onPress={handleLogin}
+              isLoading={loading}
+              fullWidth
+              size="lg"
+            >
+              로그인
+            </Button>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: theme.colors.textSecondary }]}>
+              계정이 없으신가요?{' '}
+            </Text>
+            <Text
+              style={[styles.linkText, { color: theme.colors.primary }]}
+              onPress={() => navigation.navigate('Register')}
+            >
+              회원가입
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
   },
-  content: {
+  keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing[6],
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing[10],
+  },
+  logoContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[4],
+  },
+  logoText: {
+    fontSize: 32,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#0ea5e9',
-    textAlign: 'center',
-    marginBottom: 8,
+    fontSize: typography.fontSize['3xl'],
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing[2],
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: typography.fontSize.base,
     textAlign: 'center',
-    marginBottom: 48,
   },
-  input: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+  form: {
+    marginBottom: spacing[8],
   },
-  button: {
-    backgroundColor: '#0ea5e9',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 16,
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  footerText: {
+    fontSize: typography.fontSize.sm,
   },
-  link: {
-    color: '#0ea5e9',
-    textAlign: 'center',
-    fontSize: 14,
+  linkText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
 });
