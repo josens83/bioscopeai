@@ -1,7 +1,7 @@
 # ========================================
 # Stage 1: Builder - 의존성 빌드 및 설치
 # ========================================
-FROM python:3.11-slim as builder
+FROM python:3.14-slim as builder
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # ========================================
 # Stage 2: Runtime - 실행 환경
 # ========================================
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
