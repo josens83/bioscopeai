@@ -280,7 +280,7 @@ jobs:
 
     steps:
       - name: PR Comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const { data: comments } = await github.rest.issues.listComments({
