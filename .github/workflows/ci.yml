@@ -92,7 +92,7 @@ jobs:
           pytest -v --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=50
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         if: github.event_name == 'push'
         with:
           files: ./backend/coverage.xml
@@ -131,7 +131,7 @@ jobs:
         run: npm run test:coverage -- --reporter=verbose --run
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         if: github.event_name == 'push'
         with:
           files: ./frontend/coverage/coverage-final.json
